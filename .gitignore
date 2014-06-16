@@ -1,2 +1,13 @@
 *.png
 *.JPG
+*.tlog
+*.obj
+*.log
+*.idb
+*.unsuccessfulbuild
+*.pdb
+*.manifest
+*.pch
+*.cache
+*.lastbuildstate
+*.txt
