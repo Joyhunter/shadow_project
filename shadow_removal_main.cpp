@@ -3,8 +3,8 @@
 
 int _tmain(int argc, _TCHAR* argv[])
 {
-	cvi* src = cvlic("images//1.png");
-	cvi* dst = cvlic("images//1.png");
+	cvi* src = cvlic("images//1_small.png");
+	cvi* dst = cvlic("images//1_small.png");
 
 	GPMProc proc;
 	proc.RunGPM(src, dst);

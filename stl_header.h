@@ -63,6 +63,7 @@ typedef vector<double> vecD;
 
 #define _f (float)
 #define _i (int)
+#define pause system("pause")
 
 /***************** function **********************/
 template <class T>
@@ -133,21 +134,35 @@ inline T mid3(T r, T g, T b)
 }
 
 template <class T1, class T2, class T3>
-inline JREAL gaussian(T1 val, T2 center, T3 sigma){
+inline JREAL gaussian(T1 val, T2 center, T3 sigma)
+{
 	return exp(-sqr(((JREAL)val - (JREAL)center)/(JREAL)sigma) / 2);
 }
 
 template <class T1, class T2, class T3>
-inline JREAL gaussianNormalize(T1 val, T2 center, T3 sigma){
+inline JREAL gaussianNormalize(T1 val, T2 center, T3 sigma)
+{
 	return 1.0/(JREAL)sigma/sqrt(2.0*PI) * gaussian(val, center, sigma);
 }
 
 template <typename T>
-inline JREAL distEulerL1(T x1, T y1, T x2, T y2){
+inline JREAL distEulerL1(T x1, T y1, T x2, T y2)
+{
 	return abs((JREAL)(x1-x2)) + abs((JREAL)(y1-y2));
 }
 
 template <typename T>
-inline JREAL distEulerL2(T x1, T y1, T x2, T y2){
+inline JREAL distEulerL2(T x1, T y1, T x2, T y2)
+{
 	return sqrt((JREAL)(sqr(x1-x2) + sqr(y1-y2)));
+}
+
+inline void randInit()
+{
+	srand((unsigned int)time(0));
+}
+
+inline float rand1()
+{
+	return (float)rand()/RAND_MAX;
 }

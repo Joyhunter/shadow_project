@@ -27,6 +27,16 @@ public:
 	void UpdatePatchDistance(cvi* dst, cvi* src);
 	void ShowCorr(string imgStr);
 	void ShowCorrDist(string imgStr);
+	int GetCorrIdx(int r, int c){
+		return (r * m_width + c) * m_knn;
+	}
+	Corr& Get(int idx){
+		return m_values[idx];
+	}
+	float GetDistThres(int r, int c){
+		return m_values[GetCorrIdx(r, c+1) - 1].dist;
+	}
+	void AddCoor(int r, int c, float cx, float cy, float cs, float cr, float cdist);
 private:
 	int m_width, m_height, m_knn;
 	int m_patchOffset;
@@ -56,6 +66,16 @@ public:
 	~GPMProc(void);
 
 	void RunGPM(cvi* src, cvi* dst);
+
+private:
+
+	void Propagate(cvi* src, cvi* dst, int x, int y, bool direction, 
+		DenseCorr& dsCor, Interval wItvl, Interval hItvl);
+	void RandomSearch(cvi* src, cvi* dst, int x, int y, 
+		DenseCorr& dsCor, Interval wItvl, Interval hItvl);
+
+	float ComputePatchDist(cvi* src, cvi* dst, int x, int y, 
+		float sx, float sy, float sScale, float sRot);
 
 private:
 
