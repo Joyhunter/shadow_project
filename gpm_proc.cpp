@@ -95,28 +95,33 @@ void DenseCorr::AddCoor(int r, int c, float cx, float cy, float cs, float cr,
 	v.dist = cdist;
 }
 
+Patch PatchDistMetric::GetPatch(cvi* src, float x, float y, float s, float r, int patchOffset)
+{
+	int nPixels = sqr(2*patchOffset + 1);
+	Patch vs(nPixels);
+	int idx = 0;
+	doFs(pr, -patchOffset, patchOffset+1) doFs(pc, -patchOffset, patchOffset+1)
+	{
+		float preAngle = atan2(_f(pr), _f(pc));
+		float length = sqrt(sqr(_f(pr)) + sqr(_f(pc)));
+		float spRowCur = x + length * sin(preAngle - r) * s;
+		float spColCur = y + length * cos(preAngle - r) * s;
+		vs[idx] = cvg2(src, spRowCur, spColCur);
+		idx++;
+	}
+	return vs;
+}
+
 float PatchDistMetric::ComputePatchDist(cvi* dst, float dpRow, float dpCol, 
 	cvi* src, float spRow, float spCol, float spScale, float spRotate, 
 	int patchOffset)
 {
-	int nPixels = sqr(2*patchOffset + 1);
-	vector<cvS> vd(nPixels), vs(nPixels);
-	int idx = 0;
-	doFs(pr, -patchOffset, patchOffset+1) doFs(pc, -patchOffset, patchOffset+1)
-	{
-		float dpRowCur = dpRow + pr, dpColCur = dpCol + pc;
-		float preAngle = atan2(_f(pr), _f(pc));
-		float length = sqrt(sqr(_f(pr)) + sqr(_f(pc)));
-		float spRowCur = spRow + length * sin(preAngle - spRotate) * spScale;
-		float spColCur = spCol + length * cos(preAngle - spRotate) * spScale;
-		vd[idx] = cvg2(dst, dpRowCur, dpColCur);
-		vs[idx] = cvg2(src, spRowCur, spColCur);
-		idx++;
-	}
+	Patch vd = GetPatch(dst, dpRow, dpCol, 1.f, 0.f, patchOffset);
+	Patch vs = GetPatch(src, spRow, spCol, spScale, spRotate, patchOffset);
 	return ComputeVectorDist(vd, vs);
 }
 
-float RegularPatchDistMetric::ComputeVectorDist(vector<cvS>& vDst, vector<cvS>& vSrc)
+float RegularPatchDistMetric::ComputeVectorDist(Patch& vDst, Patch& vSrc)
 {
 	float sum = 0;
 	doFv(i, vDst)
@@ -126,12 +131,17 @@ float RegularPatchDistMetric::ComputeVectorDist(vector<cvS>& vDst, vector<cvS>& 
 	return sqrt(sum / vDst.size()); 
 }
 
-float LmnIvrtPatchDistMetric::ComputeVectorDist(vector<cvS>& vDst, vector<cvS>& vSrc)
+float LmnIvrtPatchDistMetric::ComputeVectorDist(Patch& vDst, Patch& vSrc)
 {
-	//hsv: dst(v)*alpha = src
-	int useAlpha[] = {-1, -1, 1};
-	float useChannels[] = {1, 0, 1};
-	//rgb: dst(rgb)*alpha = src
+	//hls: dst(l)*a = src(l), D(dst(h, l*a), src(h, l))
+	int useAlpha[] = {-1, 1, -1};
+	float useChannels[] = {1, 1, 0};
+
+	//hsv: dst(v)*a = src(v), D(dst(h, v*a), src(h, v))
+	//int useAlpha[] = {-1, -1, 1};
+	//float useChannels[] = {1, 0, 1};
+
+	//rgb: dst(rgb)*a = src(rgb), D(dst(r*a, g*a, b*a), src(r, g, b))
 	//int useAlpha[] = {1, 1, 1};
 	//float useChannels[] = {1, 1, 1};
 
@@ -254,6 +264,7 @@ DenseCorr* GPMProc::RunGPM(cvi* src, cvi* dst)
 	return dsCor;
 }
 
+//todo: patch pre generate
 void GPMProc::Propagate(cvi* src, cvi* dst, int x, int y, bool direction, 
 	DenseCorr& dsCor, Interval wItvl, Interval hItvl, 
 	Interval swItvl, Interval shItvl)
@@ -266,6 +277,7 @@ void GPMProc::Propagate(cvi* src, cvi* dst, int x, int y, bool direction,
 		offsetIdxEnd = 4;
 	}
 
+	Patch dstPatch = m_metric->GetPatch(dst, _f x, _f y, 1.f, 0.f, m_patchOffset);
 	float distThres = dsCor.GetDistThres(x, y);
 	doFs(i, offsetIdxStart, offsetIdxEnd)
 	{
@@ -281,7 +293,9 @@ void GPMProc::Propagate(cvi* src, cvi* dst, int x, int y, bool direction,
 			float angle = atan2(-(float)dx, -(float)dy);
 			float newX = clamp(v.x + sin(angle - v.r) * v.s, shItvl.min, shItvl.max);
 			float newY = clamp(v.y + cos(angle - v.r) * v.s, swItvl.min, swItvl.max);
-			float patchDist = ComputePatchDist(src, dst, x, y, newX, newY, v.s, v.r);
+			Patch srcPatch = m_metric->GetPatch(src, newX, newY, v.s, v.r, m_patchOffset);
+			float patchDist = m_metric->ComputeVectorDist(dstPatch, srcPatch);
+			//float patchDist = ComputePatchDist(src, dst, x, y, newX, newY, v.s, v.r);
 			if(patchDist < distThres){
 				dsCor.AddCoor(x, y, newX, newY, v.s, v.r, patchDist);
 				distThres = dsCor.GetDistThres(x, y);
@@ -299,6 +313,8 @@ void GPMProc::RandomSearch(cvi* src, cvi* dst, int x, int y,
 	vector<Corr> corrs(m_knn);
 	doF(k, m_knn) corrs[k] = dsCor.Get(idx + k);
 
+	Patch dstPatch = m_metric->GetPatch(dst, _f x, _f y, 1.f, 0.f, m_patchOffset);
+
 	float scaleFactor = 0.5f;
 	doF(k, m_knn)
 	{
@@ -313,7 +329,11 @@ void GPMProc::RandomSearch(cvi* src, cvi* dst, int x, int y,
 			float newy = clamp(wSpace * (2 * rand1() - 1) + v.y, wItvl.min, wItvl.max);
 			float news = clamp(sSpace * (2 * rand1() - 1) + v.s, m_minScale, m_maxScale);
 			float newr = clamp(rSpace * (2 * rand1() - 1) + v.r, m_minRotate, m_maxRotate);
-			float patchDist = ComputePatchDist(src, dst, x, y, newx, newy, news, newr);
+			
+			Patch srcPatch = m_metric->GetPatch(src, newx, newy, news, newr, m_patchOffset);
+			float patchDist = m_metric->ComputeVectorDist(dstPatch, srcPatch);
+			//float patchDist = ComputePatchDist(src, dst, x, y, newx, newy, news, newr);
+			
 			if(patchDist < distThres){
 				dsCor.AddCoor(x, y, newx, newy, news, newr, patchDist);
 				distThres = dsCor.GetDistThres(x, y);
@@ -365,9 +385,9 @@ void DenseCorrBox2D::ShowCorr(string imgStr)
 	cvri(res);
 }
 
-vector<Corr> DenseCorrBox2D::GetCorrsPerGrid(int r, int c)
+MultiCorr DenseCorrBox2D::GetCorrsPerGrid(int r, int c)
 {	
-	vector<Corr> result(0);
+	MultiCorr result(0);
 	if(!cvIn(r, c, 0, GetValue(0, 0)->m_height, 0, GetValue(0, 0)->m_width)) return result;
 
 	result.resize(m_nWidth * m_nHeight);
@@ -409,7 +429,7 @@ void DenseCorrBox2D::ShowGridCorrs(CvRect& roi, int r, int c, int radius, cvi* s
 
 void DenseCorrBox2D::ShowGridCorrs(CvRect& roi, int r, int c, int radius, cvi* src, cvi* res)
 {
-	vector<Corr> corrs = GetCorrsPerGrid(r, c);
+	MultiCorr corrs = GetCorrsPerGrid(r, c);
 	int basicRadius = radius;
 	doFv(i, corrs)
 	{
@@ -484,7 +504,7 @@ void GridGPMProc::RunGridGPM(cvi* src, string saveFile)
 		cvi* gpmSrc = cvci83(gridW, gridH);
 		cvSetImageROI(src, cvRect(_i wInts[j].min, _i hInts[i].min, gridW, gridH));
 		cvCopy(src, gpmSrc);
-
+		
 		DenseCorr* corr = m_proc->RunGPM(gpmSrc, gpmDst);
 
 		box.SetValue(i, j, corr);
@@ -495,34 +515,53 @@ void GridGPMProc::RunGridGPM(cvi* src, string saveFile)
 	if(saveFile != "") box.Save(saveFile);
 	
 	box.ShowCorr("temp.png");
-	box.ShowGridCorrs(m_roi, 10, 10, GetPatchRadius(), src, "temp2.png");
-	cout<<box.GetCorrsPerGrid(10, 10);
-
+	//box.ShowGridCorrs(m_roi, 10, 10, GetPatchRadius(), src, "temp2.png");
+	//cout<<box.GetCorrsPerGrid(10, 10);
 
 	cvri(gpmDst);
 }
 
 string ui_winTitle = "Click to select patch";
-cvi* ui_src;
+cvi* ui_src, *ui_srcHLS;
 GridGPMProc* ui_proc;
 DenseCorrBox2D* ui_box;
-void UIMouseClick(int event,int x,int y,int flags,void *param)
+void UIMouseClick(int event, int x, int y, int flags, void *param)
 {
 	if(event != CV_EVENT_LBUTTONDOWN) return;
 	cout<<x<<" "<<y<<endl;
 
 	cvi* show = cvci(ui_src);
 	CvRect& rect = ui_proc->GetROI();
+
 	ui_box->ShowGridCorrs(rect, y - rect.y, x - rect.x, ui_proc->GetPatchRadius(), 
 		ui_src, show);
 	cvShowImage(ui_winTitle.c_str(), show);
 	cvri(show);
+
+	//print luminance of each patch
+	float dstLmnc = PatchLmncProc::GetAvgLmnc(PatchDistMetric::GetPatch(ui_srcHLS, 
+		_f y, _f x, 1.f, 0.f, ui_proc->GetPatchRadius()));
+	cout<<dstLmnc<<endl;
+
+	MultiCorr corrs = ui_box->GetCorrsPerGrid(y - rect.y, x - rect.x);
+	LmncVec srcLmncVec(corrs.size());
+	doFv(i, srcLmncVec)
+	{
+		Patch srcPatch = PatchDistMetric::GetPatch(ui_srcHLS, corrs[i].x, 
+			corrs[i].y, corrs[i].s, corrs[i].r, ui_proc->GetPatchRadius());
+		srcLmncVec[i] = PatchLmncProc::GetAvgLmnc(srcPatch);
+	}
+
+	LmncHist hist = PatchLmncProc::GetLmncHist(srcLmncVec);
+	doFv(i, hist) cout<<hist[i]<<" ";
+	cout<<endl;
 }
-void GridGPMProc::ShowGPMResUI(cvi* src, string fileStr)
+void GridGPMProc::ShowGPMResUI(cvi* src, cvi* srcHLS, string fileStr)
 {
 	DenseCorrBox2D box;
 	ui_proc = this;
 	ui_src = src;
+	ui_srcHLS = srcHLS;
 	box.Load(fileStr);
 	ui_box = &box;
 
@@ -532,10 +571,25 @@ void GridGPMProc::ShowGPMResUI(cvi* src, string fileStr)
 	setMouseCallback(ui_winTitle.c_str(), UIMouseClick, 0);
 	cvWaitKey(0);
 	cvDestroyWindow(ui_winTitle.c_str());
+}
 
-// 	box.ShowCorr("temp.png");
-// 	box.ShowGridCorrs(m_roi, 30, 30, GetPatchRadius(), src, "temp2.png");
-// 	cout<<box.GetCorrsPerGrid(10, 10);
+float PatchLmncProc::GetAvgLmnc(Patch& vs)
+{
+	//hls
+	float sum = 0;
+	doFv(i, vs) sum += _f vs[i].val[1];
+	return sum / vs.size();
+}
+
+LmncHist PatchLmncProc::GetLmncHist(LmncVec& lmncVec)
+{
+	int N = 25;
+	LmncHist hist(N, 0);
+	doFv(i, lmncVec)
+	{
+		hist[_i floor(lmncVec[i] * N / 255)] ++;
+	}
+	return hist;
 }
 
 void Corr::Save(ostream& fout)

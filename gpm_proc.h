@@ -1,21 +1,27 @@
 #pragma once
 
+typedef vector<cvS> Patch;
+
 class PatchDistMetric
 {
-	virtual float ComputeVectorDist(vector<cvS>& vDst, vector<cvS>& vSrc) = 0;
 public:
+	virtual float ComputeVectorDist(Patch& vDst, Patch& vSrc) = 0;
 	float ComputePatchDist(cvi* dst, float dpRow, float dpCol, 
 		cvi* src, float spRow, float spCol, float spScale, float spRotate, 
+		int patchOffset);
+	static Patch GetPatch(cvi* src, float x, float y, float s, float r, 
 		int patchOffset);
 };
 
 class RegularPatchDistMetric : public PatchDistMetric
 {
+public:
 	float ComputeVectorDist(vector<cvS>& vDst, vector<cvS>& vSrc);
 };
 
 class LmnIvrtPatchDistMetric : public PatchDistMetric
 {
+public:
 	float ComputeVectorDist(vector<cvS>& vDst, vector<cvS>& vSrc);
 };
 
@@ -47,6 +53,8 @@ public:
 	void Save(ostream& fout);
 	void Load(istream& fin);
 };
+
+typedef vector<Corr> MultiCorr;
 
 class DenseCorr
 {
@@ -130,7 +138,7 @@ public:
 	void SetIntevals(vector<Interval>& ws, vector<Interval>& hs){
 		wInts = ws; hInts = hs;
 	}
-	vector<Corr> GetCorrsPerGrid(int r, int c);
+	MultiCorr GetCorrsPerGrid(int r, int c);
 	void ShowGridCorrs(CvRect& roi, int r, int c, int radius, cvi* src, string imgStr);
 	void ShowGridCorrs(CvRect& roi, int r, int c, int radius, cvi* src, cvi* res);
 	void Save(string file);
@@ -152,7 +160,7 @@ public:
 
 	void SetROI(CvRect roi);
 	void RunGridGPM(cvi* src, string saveFile = "");
-	void ShowGPMResUI(cvi* src, string fileStr);
+	void ShowGPMResUI(cvi* src, cvi* srcHLS, string fileStr);
 
 	CvRect GetROI(){
 		return m_roi;
@@ -174,4 +182,14 @@ private:
 	int m_patchSize;
 	CvRect m_roi;
 
+};
+
+typedef vector<float> LmncVec;
+typedef vector<int> LmncHist;
+
+class PatchLmncProc
+{
+public:
+	static float GetAvgLmnc(Patch& vs);
+	static LmncHist GetLmncHist(LmncVec& lmnc);
 };

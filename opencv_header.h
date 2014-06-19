@@ -369,6 +369,13 @@ inline bool cvIn(T r, T c, T rLow, T rHigh, T cLow, T cHigh)
 
 inline cvS cvg2(cvi* img, float x, float y)
 {
+	x = clamp(x, 0.f, _f img->height-1);
+	y = clamp(y, 0.f, _f img->width-1);
+	if(fequal(x, _f round(x)) && fequal(y, _f round(y)))
+	{
+		return cvGet2D(img, round(x), round(y));
+	}
+
 	int x1 = _i(floor(x)), x2 = x1 + 1;
 	int y1 = _i(floor(y)), y2 = y1 + 1;
 	float alpha1 = x - x1, alpha2 = y - y1;

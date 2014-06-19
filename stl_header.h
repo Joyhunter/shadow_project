@@ -29,6 +29,7 @@
 	5. gaussian(Normalize) (val, center, sigma)
 	6. randInit rand1
 	7. cout (vector)
+	8. fequal
 
   History:
     1. Date: 2014.5.14
@@ -188,4 +189,9 @@ inline ostream& operator << (ostream& out, vector<T>& vals)
 	out<<vals.size()<<endl;
 	doFv(i, vals) out<<vals[i]<<endl;
 	return out;
+}
+
+inline bool fequal(float v1, float v2)
+{
+	return (fabs(v1 - v2) < 1e-6);
 }
