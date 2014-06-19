@@ -10,7 +10,7 @@
 
   Header List:
 	1. iostream/cmath/string/vector/map/functional
-	   /queue/deque
+	   /queue/deque/ctime/fstream/sstream
 
   Type List:
 	1. vectors: vecS vecI vecF vecD vecB
@@ -18,6 +18,8 @@
   Abbreviation List:
 	1. JREAL(double)
 	2. for: doF doFs doFv doFvs
+	3. type: _i _f
+	4. pause
 
   Function List: 
     1. round/sqr/toStr (T) 
@@ -25,6 +27,8 @@
 	3. clamp/min3/max3/mid3 (T, T, T)
 	4. distEulerL1/2 (x1, y1, x2, y2)
 	5. gaussian(Normalize) (val, center, sigma)
+	6. randInit rand1
+	7. cout (vector)
 
   History:
     1. Date: 2014.5.14
@@ -44,6 +48,7 @@
 #include <queue>
 #include <deque>
 #include <ctime>
+#include <fstream>
 #include <sstream>
 using namespace std;
 
@@ -165,4 +170,22 @@ inline void randInit()
 inline float rand1()
 {
 	return (float)rand()/RAND_MAX;
+}
+
+template <class T>
+inline istream& operator >> (istream& in, vector<T>& vals)
+{
+	int s; 
+	in>>s;
+	val.resize(s);
+	doFv(i, vals) in>>vals[i];
+	return in;
+}
+
+template <class T>
+inline ostream& operator << (ostream& out, vector<T>& vals)
+{
+	out<<vals.size()<<endl;
+	doFv(i, vals) out<<vals[i]<<endl;
+	return out;
 }
