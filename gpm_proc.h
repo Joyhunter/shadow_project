@@ -2,7 +2,7 @@
 
 class PatchDistMetric
 {
-	virtual float ComputeVectorDist(vector<cvS> vDst, vector<cvS> vSrc) = 0;
+	virtual float ComputeVectorDist(vector<cvS>& vDst, vector<cvS>& vSrc) = 0;
 public:
 	float ComputePatchDist(cvi* dst, float dpRow, float dpCol, 
 		cvi* src, float spRow, float spCol, float spScale, float spRotate, 
@@ -11,12 +11,12 @@ public:
 
 class RegularPatchDistMetric : public PatchDistMetric
 {
-	float ComputeVectorDist(vector<cvS> vDst, vector<cvS> vSrc);
+	float ComputeVectorDist(vector<cvS>& vDst, vector<cvS>& vSrc);
 };
 
 class LmnIvrtPatchDistMetric : public PatchDistMetric
 {
-	float ComputeVectorDist(vector<cvS> vDst, vector<cvS> vSrc);
+	float ComputeVectorDist(vector<cvS>& vDst, vector<cvS>& vSrc);
 };
 
 class Interval

@@ -116,7 +116,7 @@ float PatchDistMetric::ComputePatchDist(cvi* dst, float dpRow, float dpCol,
 	return ComputeVectorDist(vd, vs);
 }
 
-float RegularPatchDistMetric::ComputeVectorDist(vector<cvS> vDst, vector<cvS> vSrc)
+float RegularPatchDistMetric::ComputeVectorDist(vector<cvS>& vDst, vector<cvS>& vSrc)
 {
 	float sum = 0;
 	doFv(i, vDst)
@@ -126,26 +126,49 @@ float RegularPatchDistMetric::ComputeVectorDist(vector<cvS> vDst, vector<cvS> vS
 	return sqrt(sum / vDst.size()); 
 }
 
-float LmnIvrtPatchDistMetric::ComputeVectorDist(vector<cvS> vDst, vector<cvS> vSrc)
+float LmnIvrtPatchDistMetric::ComputeVectorDist(vector<cvS>& vDst, vector<cvS>& vSrc)
 {
-	//dst(rgb)*alpha = src
-	cvS sumS = cvs(0), sumD = cvs(0);
+	//hsv: dst(v)*alpha = src
+	int useAlpha[] = {-1, -1, 1};
+	float useChannels[] = {1, 0, 1};
+	//rgb: dst(rgb)*alpha = src
+	//int useAlpha[] = {1, 1, 1};
+	//float useChannels[] = {1, 1, 1};
+
+	cvS sumS = cvs(0, 0, 0), sumD = cvs(0, 0, 0);
 	doFv(i, vSrc)
 	{
 		sumS += vSrc[i];
 		sumD += vDst[i];
 	}
-	float sumS2 = _f (sumS.val[0] + sumS.val[1] + sumS.val[2]);
-	float sumD2 = _f (sumD.val[0] + sumD.val[1] + sumD.val[2]);
-	float alpha = 1;
-	if(sumD2 > 0) alpha = clamp(sumS2 / sumD2, 0.1f, 10.0f);
+	cvS alpha = cvs(1, 1, 1);
+	doF(k, 3)
+	{
+		float sumS2 = 0, sumD2 = 0;
+		doF(i, 3)
+		{
+			if(useAlpha[i] != k) continue;
+			sumS2 +=  _f sumS.val[i];
+			sumD2 += _f sumD.val[i];
+		}
+		if(sumD2 > 0) alpha.val[k] = clamp(sumS2 / sumD2, 0.1f, 10.0f);
+	}
 
 	float sum = 0;
 	doFv(i, vDst)
 	{
-		sum += _f cvSDSqr(vDst[i] * alpha, vSrc[i]);
+		cvS dstV = vDst[i], srcV = vSrc[i];
+		doF(k, 3)
+		{
+			if(useAlpha[k] > 0) dstV.val[k] *= alpha.val[useAlpha[k]];
+			dstV.val[k] *= useChannels[k];
+			srcV.val[k] *= useChannels[k];
+		}
+		sum += _f cvSDSqr(dstV, srcV);
 	}
 	return sqrt(sum / vDst.size());
+
+	
 }
 
 GPMProc::GPMProc(PatchDistMetric* metric, int knn, int patchSize, int nItr):
