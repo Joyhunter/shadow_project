@@ -160,7 +160,7 @@ public:
 
 	void SetROI(CvRect roi);
 	void RunGridGPM(cvi* src, string saveFile = "");
-	void ShowGPMResUI(cvi* src, cvi* srcHLS, string fileStr);
+	void ShowGPMResUI(cvi* src, cvi* srcHLS, string fileStr, float distThres = 255);
 
 	CvRect GetROI(){
 		return m_roi;
@@ -184,12 +184,17 @@ private:
 
 };
 
-typedef vector<float> LmncVec;
-typedef vector<int> LmncHist;
+//.first = patch luminance  .second = patch similarity / confidence 0~255
+typedef vector<pair<float, float>> LmncVec;
+//.first = all patch numbers in each hist  .second = confident patch numbers
+typedef vector<pair<int, int>> LmncHist;
 
 class PatchLmncProc
 {
 public:
+	static int histN;
 	static float GetAvgLmnc(Patch& vs);
-	static LmncHist GetLmncHist(LmncVec& lmnc);
+	static int GetHistIdx(float lmnc);
+	static LmncHist GetLmncHist(LmncVec& lmnc, float distThres = 255);
+	static cvi* ShowHistInCvi(LmncHist& hist, int focusIdx = -1);
 };

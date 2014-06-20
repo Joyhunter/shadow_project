@@ -496,8 +496,10 @@ void GridGPMProc::RunGridGPM(cvi* src, string saveFile)
 
 	omp_set_num_threads(nCores);
 #pragma omp parallel for
-	doF(i, nGridh) doF(j, nGridw)
+	doF(k, nGridh * nGridw)
 	{
+		int i = k / nGridw;
+		int j = k % nGridw;
 		cout<<"\rProcessing grid ("<<i<<", "<<j<<")";
 		int gridW = _i wInts[j].max - _i wInts[j].min, gridH = _i hInts[i].max - _i hInts[i].min;
 
@@ -521,57 +523,74 @@ void GridGPMProc::RunGridGPM(cvi* src, string saveFile)
 	cvri(gpmDst);
 }
 
-string ui_winTitle = "Click to select patch";
-cvi* ui_src, *ui_srcHLS;
-GridGPMProc* ui_proc;
-DenseCorrBox2D* ui_box;
+//test ui function
+struct UI_param
+{
+	string ui_winTitle, ui_winTitle2;
+	cvi* ui_src, *ui_srcHLS;
+	GridGPMProc* ui_proc;
+	DenseCorrBox2D* ui_box;
+	float distThres;
+};
+bool LDown = false;
 void UIMouseClick(int event, int x, int y, int flags, void *param)
 {
-	if(event != CV_EVENT_LBUTTONDOWN) return;
-	cout<<x<<" "<<y<<endl;
+	if(event == CV_EVENT_LBUTTONDOWN) LDown = true;
+	else if(event == CV_EVENT_LBUTTONUP) LDown = false;
+	if(!LDown) return;
+	UI_param* uiParam = (UI_param*)param;
+	cvi* ui_src = uiParam->ui_src, *ui_srcHLS = uiParam->ui_srcHLS;
+	GridGPMProc* ui_proc = uiParam->ui_proc;
+	DenseCorrBox2D* ui_box = uiParam->ui_box;
 
+	//show rects in src img
 	cvi* show = cvci(ui_src);
 	CvRect& rect = ui_proc->GetROI();
-
 	ui_box->ShowGridCorrs(rect, y - rect.y, x - rect.x, ui_proc->GetPatchRadius(), 
 		ui_src, show);
-	cvShowImage(ui_winTitle.c_str(), show);
+	cvShowImage(uiParam->ui_winTitle.c_str(), show);
 	cvri(show);
 
-	//print luminance of each patch
+	//show luminance hists of the patch group
 	float dstLmnc = PatchLmncProc::GetAvgLmnc(PatchDistMetric::GetPatch(ui_srcHLS, 
 		_f y, _f x, 1.f, 0.f, ui_proc->GetPatchRadius()));
-	cout<<dstLmnc<<endl;
-
 	MultiCorr corrs = ui_box->GetCorrsPerGrid(y - rect.y, x - rect.x);
 	LmncVec srcLmncVec(corrs.size());
 	doFv(i, srcLmncVec)
 	{
 		Patch srcPatch = PatchDistMetric::GetPatch(ui_srcHLS, corrs[i].x, 
 			corrs[i].y, corrs[i].s, corrs[i].r, ui_proc->GetPatchRadius());
-		srcLmncVec[i] = PatchLmncProc::GetAvgLmnc(srcPatch);
+		srcLmncVec[i].first = PatchLmncProc::GetAvgLmnc(srcPatch);
+		srcLmncVec[i].second = corrs[i].dist;
 	}
-
-	LmncHist hist = PatchLmncProc::GetLmncHist(srcLmncVec);
-	doFv(i, hist) cout<<hist[i]<<" ";
-	cout<<endl;
+	LmncHist hist = PatchLmncProc::GetLmncHist(srcLmncVec, uiParam->distThres);
+	cvi* histImg = PatchLmncProc::ShowHistInCvi(hist, PatchLmncProc::GetHistIdx(dstLmnc));
+	cvShowImage(uiParam->ui_winTitle2.c_str(), histImg);
+	cvri(histImg);
 }
-void GridGPMProc::ShowGPMResUI(cvi* src, cvi* srcHLS, string fileStr)
+void GridGPMProc::ShowGPMResUI(cvi* src, cvi* srcHLS, string fileStr, float distThres)
 {
 	DenseCorrBox2D box;
-	ui_proc = this;
-	ui_src = src;
-	ui_srcHLS = srcHLS;
+	UI_param param;
+	param.ui_proc = this;
+	param.ui_src = src;
+	param.ui_srcHLS = srcHLS;
 	box.Load(fileStr);
-	ui_box = &box;
+	param.ui_box = &box;
+	param.ui_winTitle = "Image";
+	param.ui_winTitle2 = "Hist";
+	param.distThres = distThres;
 
-	cvNamedWindow(ui_winTitle.c_str(), WINDOW_AUTOSIZE);
-	cvShowImage(ui_winTitle.c_str(), src);
+	cvNamedWindow(param.ui_winTitle.c_str(), WINDOW_AUTOSIZE);
+	cvNamedWindow(param.ui_winTitle2.c_str(), WINDOW_AUTOSIZE);
+	cvShowImage(param.ui_winTitle.c_str(), src);
 
-	setMouseCallback(ui_winTitle.c_str(), UIMouseClick, 0);
+	setMouseCallback(param.ui_winTitle.c_str(), UIMouseClick, &param);
 	cvWaitKey(0);
-	cvDestroyWindow(ui_winTitle.c_str());
+	cvDestroyWindow(param.ui_winTitle.c_str());
 }
+
+int PatchLmncProc::histN = 25;
 
 float PatchLmncProc::GetAvgLmnc(Patch& vs)
 {
@@ -581,15 +600,44 @@ float PatchLmncProc::GetAvgLmnc(Patch& vs)
 	return sum / vs.size();
 }
 
-LmncHist PatchLmncProc::GetLmncHist(LmncVec& lmncVec)
+int PatchLmncProc::GetHistIdx(float lmnc)
 {
-	int N = 25;
-	LmncHist hist(N, 0);
+	return _i floor(lmnc * histN / 255);
+}
+
+LmncHist PatchLmncProc::GetLmncHist(LmncVec& lmncVec, float distThres)
+{
+	LmncHist hist(histN);
 	doFv(i, lmncVec)
 	{
-		hist[_i floor(lmncVec[i] * N / 255)] ++;
+		int idx = GetHistIdx(lmncVec[i].first);
+		hist[idx].first++;
+		if(lmncVec[i].second < distThres)
+			hist[idx].second++;
 	}
 	return hist;
+}
+
+cvi* PatchLmncProc::ShowHistInCvi(LmncHist& hist, int focusIdx)
+{
+	int histWidth = 10;
+	int showHeight = 100;
+	int showHRatio = 10;
+	int gap = 1;
+	cvi* img = cvci83(histWidth * hist.size(), 100);
+	cvZero(img);
+	doFv(i, hist)
+	{
+		cvS color = cvs(0, 0, 255);
+		if(i == focusIdx) color = cvs(255, 0, 0);
+		int histHeight = showHRatio * hist[i].first;
+		int histHeight2 = showHRatio * hist[i].second;
+		cvRectangle(img, cvPoint(i*histWidth + gap, showHeight-histHeight),
+			cvPoint((i+1)*histWidth - gap, showHeight), color, -1);
+		cvRectangle(img, cvPoint(i*histWidth + gap, showHeight-histHeight),
+			cvPoint((i+1)*histWidth - gap, showHeight-histHeight2), color / 3, -1);
+	}
+	return img;
 }
 
 void Corr::Save(ostream& fout)
@@ -633,6 +681,11 @@ void DenseCorrBox2D::Save(string file)
 void DenseCorrBox2D::Load(string file)
 {
 	ifstream fin(file.c_str());
+	if(!fin)
+	{
+		cout<<file<<" not exist error!\n";
+		return;
+	}
 	fin>>m_nWidth>>m_nHeight>>m_srcW>>m_srcH;
 	int size; fin>>size; m_box.resize(size);
 	doFv(i, m_box)
