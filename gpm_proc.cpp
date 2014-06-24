@@ -135,15 +135,18 @@ float LmnIvrtPatchDistMetric::ComputeVectorDist(Patch& vDst, Patch& vSrc)
 {
 	//hls: dst(l)*a = src(l), D(dst(h, l*a), src(h, l))
 	int useAlpha[] = {-1, 1, -1};
-	float useChannels[] = {1, 1, 0};
+	float channelWeight[] = {3, 1, 0.9f};
+	bool hasHue = true;
 
 	//hsv: dst(v)*a = src(v), D(dst(h, v*a), src(h, v))
 	//int useAlpha[] = {-1, -1, 1};
-	//float useChannels[] = {1, 0, 1};
+	//float channelWeight[] = {1, 0, 1};
+	//bool hasHue = true;
 
 	//rgb: dst(rgb)*a = src(rgb), D(dst(r*a, g*a, b*a), src(r, g, b))
 	//int useAlpha[] = {1, 1, 1};
-	//float useChannels[] = {1, 1, 1};
+	//float channelWeight[] = {1, 1, 1};
+	//bool hasHue = false;
 
 	cvS sumS = cvs(0, 0, 0), sumD = cvs(0, 0, 0);
 	doFv(i, vSrc)
@@ -171,10 +174,21 @@ float LmnIvrtPatchDistMetric::ComputeVectorDist(Patch& vDst, Patch& vSrc)
 		doF(k, 3)
 		{
 			if(useAlpha[k] > 0) dstV.val[k] *= alpha.val[useAlpha[k]];
-			dstV.val[k] *= useChannels[k];
-			srcV.val[k] *= useChannels[k];
 		}
-		sum += _f cvSDSqr(dstV, srcV);
+
+		if(hasHue)
+		{
+			float hueChange = fabs(_f (dstV.val[0] - srcV.val[0]));
+			if(hueChange > 128) hueChange = 255 - hueChange;
+			sum += sqr(hueChange) * channelWeight[0];
+		}
+		else
+		{
+			sum += _f sqr(dstV.val[0] - srcV.val[0]) * channelWeight[0];
+		}
+
+		sum += _f sqr(dstV.val[1] - srcV.val[1]) * channelWeight[1];
+		sum += _f sqr(dstV.val[2] - srcV.val[2]) * channelWeight[2];
 	}
 	return sqrt(sum / vDst.size());
 
@@ -549,6 +563,7 @@ void UIMouseClick(int event, int x, int y, int flags, void *param)
 	ui_box->ShowGridCorrs(rect, y - rect.y, x - rect.x, ui_proc->GetPatchRadius(), 
 		ui_src, show);
 	cvShowImage(uiParam->ui_winTitle.c_str(), show);
+	//cvsi("_1.png", show);
 	cvri(show);
 
 	//show luminance hists of the patch group
@@ -566,6 +581,7 @@ void UIMouseClick(int event, int x, int y, int flags, void *param)
 	LmncHist hist = PatchLmncProc::GetLmncHist(srcLmncVec, uiParam->distThres);
 	cvi* histImg = PatchLmncProc::ShowHistInCvi(hist, PatchLmncProc::GetHistIdx(dstLmnc));
 	cvShowImage(uiParam->ui_winTitle2.c_str(), histImg);
+	//cvsi("_2.png", histImg);
 	cvri(histImg);
 }
 void GridGPMProc::ShowGPMResUI(cvi* src, cvi* srcHLS, string fileStr, float distThres)

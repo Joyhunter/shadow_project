@@ -1,16 +1,17 @@
 #include "stdafx.h"
 #include "gpm_proc.h"
+#include "vote_proc.h"
 
 int _tmain(int argc, _TCHAR* argv[])
 {
-	string fileName = "7_small";
+	string fileName = "1_small";
 	int gridSize = 50;
-	int gridOffset = 40;
+	int gridOffset = 38;
 	int patchSize = 7;
 
 	cvi* src = cvlic(("images//" + fileName + ".png").c_str());
 	cvi* src2 = cvci(src);
-	cvCvtColor(src, src2, CV_BGR2HLS);
+	cvCvtColor(src, src2, CV_BGR2HLS_FULL);
 
 // 	cvi* hue = cvci81(src);
 // 	cvi* saturation = cvci81(src);
@@ -30,18 +31,22 @@ int _tmain(int argc, _TCHAR* argv[])
 	proc.SetROI(cvRect(0, 0, src->width, src->height));
 	//proc.SetROI(cvRect(30, 70, 50, 50));
 	//proc.SetROI(cvRect(109, 33, 80, 80));
-	//proc.SetROI(cvRect(129, 63, 50, 50));
+	//proc.SetROI(cvRect(149, 63, 50, 50));
 	
-	string corrFileName = fileName + "_" + toStr(gridSize) + "_" + toStr(gridOffset)
-		+ "_" + toStr(patchSize) + "_full.txt";
+	string corrFileName = "images//corr//" + fileName + "_" + toStr(gridSize) 
+		+ "_" + toStr(gridOffset) + "_" + toStr(patchSize) + "_full_test.txt";
 	//cout<<corrFileName<<endl;
 
 	proc.RunGridGPM(src2, corrFileName);
-	proc.ShowGPMResUI(src, src2, corrFileName, 30);
+	//proc.ShowGPMResUI(src, src2, corrFileName, 30);
 
+	//proc.RunGridGPM(src2, "corr.txt");
+	//proc.ShowGPMResUI(src, src2, "corr.txt", 30);
 
-	//proc.ShowGPMResUI(src, src2, "1_100_90_7.txt", 30);
-	//proc.ShowGPMResUI(src, src2, "7_test_50_40_7_full.txt");
+	VoteProc vProc;
+	vProc.LoadCorrs(corrFileName);
+	vProc.Vote(src);
+
 
 	//GPMProc proc(&metric);
 	//proc.RunGPM(src, dst);
