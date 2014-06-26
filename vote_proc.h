@@ -8,7 +8,7 @@ public:
 	~VoteProc(void);
 
 	void LoadCorrs(string fileStr);
-	void Vote(cvi* src);
+	void Vote(cvi* src, float distThres = 30.f);
 
 private:
 	DenseCorrBox2D m_corrs;

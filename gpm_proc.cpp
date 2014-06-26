@@ -135,7 +135,7 @@ float LmnIvrtPatchDistMetric::ComputeVectorDist(Patch& vDst, Patch& vSrc)
 {
 	//hls: dst(l)*a = src(l), D(dst(h, l*a), src(h, l))
 	int useAlpha[] = {-1, 1, -1};
-	float channelWeight[] = {3, 1, 0.9f};
+	float channelWeight[] = {2, 1, 0.9f};
 	bool hasHue = true;
 
 	//hsv: dst(v)*a = src(v), D(dst(h, v*a), src(h, v))

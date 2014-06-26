@@ -22,11 +22,13 @@ void VoteProc::LoadCorrs(string fileStr)
 	//cout<<m_width<<" "<<m_height<<endl;
 }
 
-void VoteProc::Vote(cvi* src)
+void VoteProc::Vote(cvi* src, float distThres)
 {
 	cvi* res = cvci323(m_width, m_height);
 	cvZero(res);
 
+	cvi* _test = cvci81(m_width, m_height);
+	float distThresBak = distThres;
 	doFcvi(res, i, j)
 	{
 		if(j == 0) cout<<i<<" ";
@@ -35,14 +37,22 @@ void VoteProc::Vote(cvi* src)
 		vector<pair<CvPoint, float> > lmncs;
 		lmncs.reserve(nPatch+1);
 
+		//get distance thres
+		vecF dists(corrs.size());
+		doFv(k, dists) dists[k] = corrs[k].dist;
+		sort(dists.begin(), dists.end());
+		float distThresSpatial = dists[_i(_f dists.size() * 0.5f)];
+		distThres = min2(distThresBak, distThresSpatial);
+		cvs20(_test, i, j, distThresSpatial);
+
 		//get luminance
 		Patch patch = PatchDistMetric::GetPatch(src, _f i, _f j, 1.f, 0.f, m_patchOffset);
 		float lmnc = PatchLmncProc::GetAvgLmnc(patch);
 		lmncs.push_back(make_pair(cvPoint(round(i), round(j)), lmnc));
-		doF(i, nPatch)
+		doF(k, nPatch)
 		{
-			Corr& v = corrs[i];
-			if(v.dist > 30) continue;
+			Corr& v = corrs[k];
+			if(v.dist > distThres) continue;
 			patch = PatchDistMetric::GetPatch(src, v.x, v.y, v.s, v.r, 
 				m_patchOffset);
 			lmnc = PatchLmncProc::GetAvgLmnc(patch);
@@ -55,7 +65,7 @@ void VoteProc::Vote(cvi* src)
 				return p1.second < p2.second;
 		});
 
-		//vote
+		//vote todo: confidence = f(coor.dist)
 		float highest = lmncs[lmncs.size() - 1].second;
 		doFv(i, lmncs)
 		{
@@ -71,6 +81,8 @@ void VoteProc::Vote(cvi* src)
 		}
 
 	}
+
+	cvsi("_test.png", _test);
 
 	cvi* shadowMask = cvci81(m_width, m_height);
 	cvSet(shadowMask, cvs(255));

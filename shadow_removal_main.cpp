@@ -5,8 +5,8 @@
 int _tmain(int argc, _TCHAR* argv[])
 {
 	string fileName = "1_small";
-	int gridSize = 50;
-	int gridOffset = 38;
+	int gridSize = 45;
+	int gridOffset = 42;
 	int patchSize = 7;
 
 	cvi* src = cvlic(("images//" + fileName + ".png").c_str());
@@ -16,9 +16,9 @@ int _tmain(int argc, _TCHAR* argv[])
 // 	cvi* hue = cvci81(src);
 // 	cvi* saturation = cvci81(src);
 // 	cvi* value = cvci81(src);
-// 	cvSplit(hsv, hue, 0, 0, 0 ); 
-// 	cvSplit(hsv, 0, saturation, 0, 0 );  
-// 	cvSplit(hsv, 0, 0, value, 0 );  
+// 	cvSplit(src2, hue, 0, 0, 0 ); 
+// 	cvSplit(src2, 0, saturation, 0, 0 );  
+// 	cvSplit(src2, 0, 0, value, 0 );  
 // 	cvsi("1.png", hue); 
 // 	cvsi("2.png", saturation); 
 // 	cvsi("3.png", value); 
@@ -27,7 +27,7 @@ int _tmain(int argc, _TCHAR* argv[])
 	RegularPatchDistMetric metric;
 	LmnIvrtPatchDistMetric metric2;
 
-	GridGPMProc proc(&metric2, gridSize, gridOffset, 1, patchSize, 20);
+	GridGPMProc proc(&metric2, gridSize, gridOffset, 1, patchSize, 30);
 	proc.SetROI(cvRect(0, 0, src->width, src->height));
 	//proc.SetROI(cvRect(30, 70, 50, 50));
 	//proc.SetROI(cvRect(109, 33, 80, 80));
@@ -38,14 +38,14 @@ int _tmain(int argc, _TCHAR* argv[])
 	//cout<<corrFileName<<endl;
 
 	proc.RunGridGPM(src2, corrFileName);
-	//proc.ShowGPMResUI(src, src2, corrFileName, 30);
+	proc.ShowGPMResUI(src, src2, corrFileName, 30);
 
 	//proc.RunGridGPM(src2, "corr.txt");
 	//proc.ShowGPMResUI(src, src2, "corr.txt", 30);
 
 	VoteProc vProc;
 	vProc.LoadCorrs(corrFileName);
-	vProc.Vote(src);
+	vProc.Vote(src, 255);
 
 
 	//GPMProc proc(&metric);
