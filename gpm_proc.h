@@ -194,6 +194,7 @@ class PatchLmncProc
 public:
 	static int histN;
 	static float GetAvgLmnc(Patch& vs);
+	static float GetAvgSatu(Patch& vs);
 	static int GetHistIdx(float lmnc);
 	static LmncHist GetLmncHist(LmncVec& lmnc, float distThres = 255);
 	static cvi* ShowHistInCvi(LmncHist& hist, int focusIdx = -1);

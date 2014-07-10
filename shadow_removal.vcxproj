@@ -80,6 +80,7 @@
   <ItemGroup>
     <ClInclude Include="gpm_proc.h" />
     <ClInclude Include="lumminance_invarient_descriptor.h" />
+    <ClInclude Include="mrf_proc.h" />
     <ClInclude Include="opencv_header.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="stl_header.h" />
@@ -89,6 +90,7 @@
   <ItemGroup>
     <ClCompile Include="gpm_proc.cpp" />
     <ClCompile Include="lumminance_invarient_descriptor.cpp" />
+    <ClCompile Include="mrf_proc.cpp" />
     <ClCompile Include="shadow_removal_main.cpp" />
     <ClCompile Include="stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>

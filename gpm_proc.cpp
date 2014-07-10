@@ -530,7 +530,7 @@ void GridGPMProc::RunGridGPM(cvi* src, string saveFile)
 	cvResetImageROI(src);
 	if(saveFile != "") box.Save(saveFile);
 	
-	box.ShowCorr("temp.png");
+	//box.ShowCorr("temp.png");
 	//box.ShowGridCorrs(m_roi, 10, 10, GetPatchRadius(), src, "temp2.png");
 	//cout<<box.GetCorrsPerGrid(10, 10);
 
@@ -613,6 +613,14 @@ float PatchLmncProc::GetAvgLmnc(Patch& vs)
 	//hls
 	float sum = 0;
 	doFv(i, vs) sum += _f vs[i].val[1];
+	return sum / vs.size();
+}
+
+float PatchLmncProc::GetAvgSatu(Patch& vs)
+{
+	//hls
+	float sum = 0;
+	doFv(i, vs) sum += _f vs[i].val[2];
 	return sum / vs.size();
 }
 
