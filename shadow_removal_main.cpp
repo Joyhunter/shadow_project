@@ -5,18 +5,18 @@
 
 int _tmain(int argc, _TCHAR* argv[])
 {
-	string fileName = "1_small";
+	string fileName = "1_small"; //1_small 7_test
 
 	cvi* src = cvlic(("images//" + fileName + ".png").c_str());
 	cvi* src2 = cvci(src);
 	cvCvtColor(src, src2, CV_BGR2HLS_FULL);
 
 	//------------------- step 1 : patch match --------------------------------
-	int gridSize = 45;
-	int gridOffset = 39;
+	int gridSize = 56;//45;//41;//45;
+	int gridOffset = 50;//39;//35;//39;
 	int patchSize = 7;
 	string corrFileName = "images//corr//" + fileName + "_" + toStr(gridSize) 
-		+ "_" + toStr(gridOffset) + "_" + toStr(patchSize) + "_full_test.txt";
+		+ "_" + toStr(gridOffset) + "_" + toStr(patchSize) + "_full_test2.txt";
 
 	LmnIvrtPatchDistMetric metric2;
 	GridGPMProc proc(&metric2, gridSize, gridOffset, 1, patchSize, 30);
@@ -24,39 +24,42 @@ int _tmain(int argc, _TCHAR* argv[])
 
 	if(0)
 	{
-		proc.RunGridGPM(src2, corrFileName);
-		proc.ShowGPMResUI(src, src2, corrFileName, 30);
+		proc.RunGridGPMMultiScale(src2, corrFileName, 2, 1);
+		proc.ShowGPMResUI(src, src2, corrFileName, 80);
 	}
 
 	//------------------- step 2 : voting  ------------------------------------
-	if(0)
+	if(1)
 	{
 		cvi* initMask = NULL, *initCfdc = NULL; 
 		VoteProc vProc;
 		vProc.LoadCorrs(corrFileName);
-		vProc.Vote(src2, initMask, initCfdc, 30, 1.0f);
-		cvsi("initMask.png", initMask);
-		cvsi("initCnfdc.png", initCfdc);
+		vProc.Vote(src2, initMask, initCfdc, 70, 1.0f); //80/0.5 80/1.0 
+		cvsic("_mask_2postprocess.png", initMask, 0);
+		cvsi("_mask_init.png", initMask);
+		cvsi("_cnfdc_init.png", initCfdc);
 	}
 
 	//------------------- step 3 : MRF ----------------------------------------
-	cvi* initMask = cvli("initMask.png");
-	cvi* initCfdc = cvli("initCnfdc.png");
+	cvi* initMask = cvli("_mask_init.png");
+	cvi* initCfdc = cvli("_cnfdc_init.png");
+	//cvi* shdwMask = cvli("_mask_init.png");
 	cvi* shdwMask = NULL;
 	MRFProc mProc;
-	mProc.SolveWithInitial(src, src2, initMask, initCfdc, 256, shdwMask);
-	cvsi("shdwMask.png", shdwMask);
+	mProc.SolveWithInitial(src, src2, initMask, initCfdc, 64, shdwMask);
+	cvsic("_mask_3res.png", shdwMask, 0);
 	cvri(initMask); cvri(initCfdc);
 
 	//------------------- step 4 : Recover ------------------------------------
+	cvsi("_src.png", src);
 	doFcvi(src, i, j)
 	{
 		auto v = cvg2(src2, i, j);
-		double alpha = cvg20(shdwMask, i, j) / 255.0;
-		cvs2(src2, i, j, cvs(v.val[0], v.val[1] / alpha, v.val[2]));
+		cvS alpha = cvg2(shdwMask, i, j) / 255.0;
+		cvs2(src2, i, j, cvs(v.val[0], v.val[1] / alpha.val[0], v.val[2] / alpha.val[1]));
 	}
 	cvCvtColor(src2, src, CV_HLS2BGR_FULL);
-	cvsi("result.png", src);
+	cvsi("_src_rev.png", src);
 
 	cvri(src);
 	cvri(src2);

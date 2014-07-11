@@ -78,6 +78,7 @@ public:
 	void AddCoor(int r, int c, float cx, float cy, float cs, float cr, float cdist);
 	void Save(ostream& fout);
 	void Load(istream& fin);
+	void LevelUp(int ratio = 2);
 public:
 	int m_width, m_height, m_knn;
 	int m_patchOffset;
@@ -93,6 +94,7 @@ public:
 	~GPMProc(void);
 
 	DenseCorr* RunGPM(cvi* src, cvi* dst);
+	void RunGPMWithInitial(cvi* src, cvi* dst, DenseCorr* );
 
 private:
 
@@ -125,6 +127,7 @@ public:
 	DenseCorrBox2D(){};
 	DenseCorrBox2D(int nWidth, int nHeight);
 	~DenseCorrBox2D();
+	void SetSize(int nWidth, int nHeight);
 	void SetValue(int r, int c, DenseCorr* corr){
 		m_box[r*m_nWidth+c] = corr;
 	}
@@ -143,10 +146,12 @@ public:
 	void ShowGridCorrs(CvRect& roi, int r, int c, int radius, cvi* src, cvi* res);
 	void Save(string file);
 	void Load(string file);
+	void LevelUp(int ratio = 2);
 private:
 	int m_nWidth, m_nHeight;
 	int m_srcW, m_srcH;
 	vector<DenseCorr*> m_box;
+public:
 	vector<Interval> wInts, hInts;
 };
 
@@ -159,7 +164,10 @@ public:
 	~GridGPMProc(void);
 
 	void SetROI(CvRect roi);
+
 	void RunGridGPM(cvi* src, string saveFile = "");
+	void RunGridGPMMultiScale(cvi* src, string saveFile = "", int ratio = 2, int levels = 1);
+
 	void ShowGPMResUI(cvi* src, cvi* srcHLS, string fileStr, float distThres = 255);
 
 	CvRect GetROI(){
@@ -171,6 +179,11 @@ public:
 	int GetPatchRadius(){
 		return (m_patchSize-1)/2;
 	}
+
+private:
+
+	void InitDenseBox2D(int srcW, int srcH, DenseCorrBox2D& box);
+	void RunGridGPM(cvi* src, DenseCorrBox2D& box, bool initValue = false);
 
 private:
 

@@ -200,8 +200,8 @@ GPMProc::GPMProc(PatchDistMetric* metric, int knn, int patchSize, int nItr):
 {
 	m_patchOffset = (m_patchSize - 1) / 2;
 
-	m_minScale = 0.8f;
-	m_maxScale = 1.25f;
+	m_minScale = 0.67f;
+	m_maxScale = 1.5f;
 	m_minRotate = -1.05f * (float)CV_PI;
 	m_maxRotate = 1.05f * (float)CV_PI;
 
@@ -237,11 +237,27 @@ DenseCorr* GPMProc::RunGPM(cvi* src, cvi* dst)
 	//dsCor->ShowCorr("init.png");
 	//dsCor->ShowCorrDist("initDist.png");
 
+	RunGPMWithInitial(src, dst, dsCor);
+
+	return dsCor;
+}
+
+void GPMProc::RunGPMWithInitial(cvi* src, cvi* dst, DenseCorr* dsCor)
+{
+
+	if(src == NULL || dst == NULL) return;
+
+	int w = dst->width, h = dst->height;
+	Interval hItvl(_f m_patchOffset, _f h - 1 - m_patchOffset);
+	Interval wItvl(_f m_patchOffset, _f w - 1 - m_patchOffset);
+
+	int sw = src->width, sh = src->height;
+	Interval shItvl(_f m_patchOffset, _f sh - 1 - m_patchOffset);
+	Interval swItvl(_f m_patchOffset, _f sw - 1 - m_patchOffset);
+
 	//iteration
 	doF(kItr, m_nItr)
 	{
-		//cout<<"\rIteration "<<kItr<<"...";
-
 		nCores = 1;
 		doF(k, nCores)
 		{
@@ -272,10 +288,7 @@ DenseCorr* GPMProc::RunGPM(cvi* src, cvi* dst)
 				RandomSearch(src, dst, x, y, *dsCor, swItvl, shItvl);
 			}
 		}
-		//dsCor->ShowCorr("res.png");
-		//dsCor->ShowCorrDist("resDist.png");
 	}
-	return dsCor;
 }
 
 //todo: patch pre generate
@@ -363,8 +376,14 @@ float GPMProc::ComputePatchDist(cvi* src, cvi* dst, int x, int y, float sx, floa
 	return m_metric->ComputePatchDist(dst, _f x, _f y, src, sx, sy, sScale, sRot, m_patchOffset);
 }
 
-DenseCorrBox2D::DenseCorrBox2D(int nWidth, int nHeight):m_nWidth(nWidth), m_nHeight(nHeight)
+DenseCorrBox2D::DenseCorrBox2D(int nWidth, int nHeight)
 {
+	SetSize(nWidth, nHeight);
+}
+
+void DenseCorrBox2D::SetSize(int nWidth, int nHeight)
+{
+	m_nHeight = nHeight; m_nWidth = nWidth;
 	m_box.resize(m_nHeight * m_nWidth, NULL);
 	m_srcH = m_srcW = 100;
 }
@@ -404,7 +423,7 @@ MultiCorr DenseCorrBox2D::GetCorrsPerGrid(int r, int c)
 	MultiCorr result(0);
 	if(!cvIn(r, c, 0, GetValue(0, 0)->m_height, 0, GetValue(0, 0)->m_width)) return result;
 
-	result.resize(m_nWidth * m_nHeight);
+	result.resize(m_nWidth * m_nHeight); 
 	doF(i, m_nHeight) doF(j, m_nWidth)
 	{
 		int idx = GetValue(i, j)->GetCorrIdx(r, c);
@@ -447,7 +466,7 @@ void DenseCorrBox2D::ShowGridCorrs(CvRect& roi, int r, int c, int radius, cvi* s
 	int basicRadius = radius;
 	doFv(i, corrs)
 	{
-		float dist = clamp(corrs[i].dist / 50.0f, 0.f, 1.f);
+		float dist = clamp(corrs[i].dist / 200.0f, 0.f, 1.f);
 		float alpha = (1 - dist); 
 		DrawRectToCvi(res, corrs[i].x, corrs[i].y, _f basicRadius, 
 			cvs(0, 0, 255*alpha), corrs[i].s, corrs[i].r);
@@ -475,6 +494,44 @@ void GridGPMProc::SetROI(CvRect roi)
 }
 
 void GridGPMProc::RunGridGPM(cvi* src, string saveFile)
+{	
+	DenseCorrBox2D box;
+	InitDenseBox2D(src->width, src->height, box);
+
+	RunGridGPM(src, box);
+
+	if(saveFile != "") box.Save(saveFile);
+
+	//box.ShowCorr("temp.png");
+	//box.ShowGridCorrs(m_roi, 10, 10, GetPatchRadius(), src, "temp2.png");
+	//cout<<box.GetCorrsPerGrid(10, 10);
+}
+
+void GridGPMProc::InitDenseBox2D(int srcW, int srcH, DenseCorrBox2D& box)
+{
+	vector<Interval> wInts, hInts;
+	int temp = 0;
+	while(temp + m_gridSize <= srcW){
+		wInts.push_back(Interval(_f temp, _f temp + m_gridSize));
+		temp += m_gridStep;
+	}
+	if(temp - m_gridStep + m_gridSize< srcW) 
+		wInts.push_back(Interval(_f temp, _f srcW));
+	temp = 0;
+	while(temp + m_gridSize <= srcH){
+		hInts.push_back(Interval(_f temp, _f temp + m_gridSize));
+		temp += m_gridStep;
+	}
+	if(temp - m_gridStep + m_gridSize < srcH) 
+		hInts.push_back(Interval(_f temp, _f srcH));
+	int nGridw = wInts.size(), nGridh = hInts.size();
+
+	box.SetSize(nGridw, nGridh);
+	box.SetSrcSize(m_gridSize, m_gridSize);
+	box.SetIntevals(wInts, hInts);
+}
+
+void GridGPMProc::RunGridGPM(cvi* src, DenseCorrBox2D& box, bool initValue)
 {
 	if(!cvIn(m_roi.y, m_roi.x, src) || 
 		!cvIn(m_roi.y + m_roi.height - 1, m_roi.x + m_roi.width - 1, src))
@@ -487,26 +544,9 @@ void GridGPMProc::RunGridGPM(cvi* src, string saveFile)
 	cvSetImageROI(src, m_roi);
 	cvCopy(src, gpmDst);
 
-	vector<Interval> wInts, hInts;
-	int temp = 0;
-	while(temp + m_gridSize <= src->width){
-		wInts.push_back(Interval(_f temp, _f temp + m_gridSize));
-		temp += m_gridStep;
-	}
-	if(temp - m_gridStep + m_gridSize< src->width) 
-		wInts.push_back(Interval(_f temp, _f src->width));
-	temp = 0;
-	while(temp + m_gridSize <= src->height){
-		hInts.push_back(Interval(_f temp, _f temp + m_gridSize));
-		temp += m_gridStep;
-	}
-	if(temp - m_gridStep + m_gridSize < src->height) 
-		hInts.push_back(Interval(_f temp, _f src->height));
-	int nGridw = wInts.size(), nGridh = hInts.size();
-	
-	DenseCorrBox2D box(nGridw, nGridh);
-	box.SetSrcSize(m_gridSize, m_gridSize);
-	box.SetIntevals(wInts, hInts);
+	int nGridw = box.wInts.size(), nGridh = box.hInts.size();
+	vector<Interval>& wInts = box.wInts;
+	vector<Interval>& hInts = box.hInts;
 
 	omp_set_num_threads(nCores);
 #pragma omp parallel for
@@ -521,20 +561,56 @@ void GridGPMProc::RunGridGPM(cvi* src, string saveFile)
 		cvSetImageROI(src, cvRect(_i wInts[j].min, _i hInts[i].min, gridW, gridH));
 		cvCopy(src, gpmSrc);
 		
-		DenseCorr* corr = m_proc->RunGPM(gpmSrc, gpmDst);
+		if(!initValue)
+		{
+			DenseCorr* corr = m_proc->RunGPM(gpmSrc, gpmDst);
+			box.SetValue(i, j, corr);
+		}
+		else
+		{
+			m_proc->RunGPMWithInitial(gpmSrc, gpmDst, box.GetValue(i, j));
+		}
 
-		box.SetValue(i, j, corr);
 		cvri(gpmSrc);
 	}
 
 	cvResetImageROI(src);
-	if(saveFile != "") box.Save(saveFile);
-	
-	//box.ShowCorr("temp.png");
-	//box.ShowGridCorrs(m_roi, 10, 10, GetPatchRadius(), src, "temp2.png");
-	//cout<<box.GetCorrsPerGrid(10, 10);
-
 	cvri(gpmDst);
+}
+
+void GridGPMProc::RunGridGPMMultiScale(cvi* src, string saveFile, int rat, int levels)
+{
+	int ratio = round(pow(_f rat, _f levels));
+	int downRatio = rat;
+
+	//init
+	DenseCorrBox2D box;
+	m_gridSize /= ratio;
+	m_gridStep /= ratio;
+	InitDenseBox2D(src->width / ratio, src->height / ratio, box);
+
+	bool first = false;
+	while(ratio >= 1)
+	{
+		cvi* srcResize = cvci83(src->width / ratio, src->height / ratio);
+		cvResize(src, srcResize);
+		SetROI(cvRect(0, 0, srcResize->width, srcResize->height));
+
+		RunGridGPM(srcResize, box, first);
+		first = true;
+
+		cvri(srcResize);
+
+		if(ratio == 1) break;
+		ratio /= downRatio;
+		//box.ShowCorr("temp.png");
+
+		box.LevelUp(downRatio);
+		//box.ShowCorr("temp2.png");
+	}
+
+	box.Save(saveFile);
+
 }
 
 //test ui function
@@ -724,3 +800,55 @@ void DenseCorrBox2D::Load(string file)
 	fin.close();
 }
 
+void DenseCorrBox2D::LevelUp(int ratio)
+{
+	m_srcH *= ratio; m_srcW *= ratio;
+	doFv(i, m_box)
+		m_box[i]->LevelUp(ratio);
+	doFv(i, wInts)
+	{
+		wInts[i].min *= ratio;
+		wInts[i].max *= ratio;
+	}
+	doFv(i, hInts)
+	{
+		hInts[i].min *= ratio;
+		hInts[i].max *= ratio;
+	}
+}
+
+void DenseCorr::LevelUp(int ratio)
+{
+	int newWidth = m_width * ratio, newHeight = m_height * ratio;
+
+	vector<Corr> newValues(newWidth * newHeight * m_knn);
+
+	doF(i, m_height) doF(j, m_width) doF(k, m_knn)
+	{
+		int oldIdx = GetCorrIdx(i, j) + k;
+		Corr& oldV = m_values[oldIdx];
+
+		doF(oi, ratio) doF(oj, ratio)
+		{
+			int idx = (i * ratio + oi) * newWidth + (j * ratio + oj) + k;
+			Corr& newV = newValues[idx];
+
+			newV.s = oldV.s;
+			newV.r = oldV.s;
+			newV.dist = oldV.dist;
+
+			float dx = (1.5f - _f ratio) + oi;
+			float dy = (1.5f - _f ratio) + oj;
+			float angle = atan2((float)dx, (float)dy);
+			float len = pow(dx*dx+dy*dy, 0.5f);
+			newV.x = ratio * oldV.x + sin(angle - oldV.r) * oldV.s * len;
+			newV.y = ratio * oldV.y + cos(angle - oldV.r) * oldV.s * len;
+
+		}
+
+	}
+
+	m_values = newValues;
+	m_width = newWidth;
+	m_height = newHeight;
+}

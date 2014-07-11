@@ -15,7 +15,7 @@
 	1. cv/cvaux/cxcore/highgui/ml
 
   Abbreviation List:
-	1. IplImage: cvi cvli(c/g) cvsi cvri
+	1. IplImage: cvi cvli(c/g) cvsi(c) cvri
 	             cvci(83/323/81/321)
 				 cvS cvs cvg2(0)(i/f) cvs2(0/3)
 	2. for: doFcvi doFcvm
@@ -169,7 +169,7 @@ inline cvi* cvci321(int width, int height)
 	return cvci321(cvSize(width, height));
 }
 
-inline cvS cvg2(cvi* img, int r, int c)
+inline cvS cvg2(const cvi* img, int r, int c)
 {
 	return cvGet2D(img, r, c);
 }
@@ -178,6 +178,20 @@ inline cvS cvg2(cvi* img, int r, int c)
 #define doFcvm(img, i, j) for (int i = 0;i<img.rows;i++) for (int j = 0;j<img.cols;j++)
 #define doForPixel(img, i, j) for (int i = 0;i<img->height;i++) for (int j = 0;j<img->width;j++)
 #define doForPixel2(img, i, j) for (int i = 0;i<img.rows;i++) for (int j = 0;j<img.cols;j++)
+
+inline int cvsic(string filename, const cvi* image, int ch = 0)
+{
+	cvi* res = cvci81(image->width, image->height);
+	doFcvi(res, i, j) cvs20(res, i, j, cvg2(image, i, j).val[ch]);
+	int v = cvSaveImage(filename.c_str(), res);
+	cvri(res);
+	return v;
+}
+
+inline int cvsic(const cvi* image, int ch = 0)
+{
+	return cvsic("autoSave.png", image, ch);
+}
 
 /***************** function **********************/
 inline double cvSDSqr(const cvS& c1, const cvS& c2)
@@ -367,7 +381,7 @@ inline bool cvIn(T r, T c, T rLow, T rHigh, T cLow, T cHigh)
 	return (r >= rLow) && (c >= cLow) && (r < rHigh) && (c < cHigh);
 }
 
-inline cvS cvg2(cvi* img, float x, float y)
+inline cvS cvg2(const cvi* img, float x, float y)
 {
 	x = clamp(x, 0.f, _f img->height-1);
 	y = clamp(y, 0.f, _f img->width-1);

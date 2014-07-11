@@ -12,6 +12,10 @@ public:
 		float distThres = 30.f, float distThresRatio = 1.0f);
 
 private:
+
+	void PostProcess(cvi* &mask, cvi* &cfdcMap);
+
+private:
 	DenseCorrBox2D m_corrs;
 	int m_width, m_height;
 	int m_patchOffset;
