@@ -130,8 +130,8 @@ void VoteProc::PostProcess(cvi* &mask, cvi* &cfdcMap)
 	cvi* mask2 = cvci(mask);
 	doFcvi(mask, i, j)
 	{
-		//if(cvg20(cfdcMap, i, j) > 50) continue;
-		//if(cvg20(mask, i, j) < 150) continue;
+		if(cvg20(cfdcMap, i, j) > 50) continue;
+		if(cvg20(mask, i, j) < 150) continue;
 		cvS v1 = cvs(0, 0, 0); float v2 = 0;
 		doFs(oi, -winSize, winSize + 1) doFs(oj, -winSize, winSize + 1)
 		{

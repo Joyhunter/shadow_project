@@ -57,7 +57,7 @@ float MRFProc::GetSmoothCost(int idx1, int idx2, int label1, int label2)
 	float legality = (label1 == label2) ? 0 : (_f colorDist(s1, s2));
 
 	//return v + legality;
-	return v * affinity * 5;// + legality * 5;
+	return v * affinity * 2;// + legality * 5;
 }
 
 void MRFProc::SolveWithInitial(IN cvi* src, IN cvi* srcHLS, IN cvi* initMask, 

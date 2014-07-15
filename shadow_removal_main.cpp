@@ -2,6 +2,7 @@
 #include "gpm_proc.h"
 #include "vote_proc.h"
 #include "mrf_proc.h"
+#include "decmps_proc.h"
 
 int _tmain(int argc, _TCHAR* argv[])
 {
@@ -29,26 +30,39 @@ int _tmain(int argc, _TCHAR* argv[])
 	}
 
 	//------------------- step 2 : voting  ------------------------------------
-	if(1)
+	if(0)
 	{
 		cvi* initMask = NULL, *initCfdc = NULL; 
 		VoteProc vProc;
 		vProc.LoadCorrs(corrFileName);
-		vProc.Vote(src2, initMask, initCfdc, 70, 1.0f); //80/0.5 80/1.0 
+		vProc.Vote(src2, initMask, initCfdc, 80, 0.5f); //80/0.5 80/1.0 
 		cvsic("_mask_2postprocess.png", initMask, 0);
 		cvsi("_mask_init.png", initMask);
 		cvsi("_cnfdc_init.png", initCfdc);
+		cvri(initMask); cvri(initCfdc);
 	}
 
 	//------------------- step 3 : MRF ----------------------------------------
-	cvi* initMask = cvli("_mask_init.png");
-	cvi* initCfdc = cvli("_cnfdc_init.png");
-	//cvi* shdwMask = cvli("_mask_init.png");
+	if(0)
+	{
+		cvi* initMask = cvli("_mask_init.png");
+		cvi* initCfdc = cvli("_cnfdc_init.png");
+		//cvi* shdwMask = cvli("_mask_init.png");
+		cvi* shdwMaskMRF = NULL;
+		MRFProc mProc;
+		mProc.SolveWithInitial(src, src2, initMask, initCfdc, 256, shdwMaskMRF);
+		cvsic("_mask_3res.png", shdwMaskMRF, 0);
+		cvsi("_mask_mrf.png", shdwMaskMRF);
+		cvri(initMask); cvri(initCfdc); cvri(shdwMaskMRF);
+	}
+
+	//------------------- step 4: decompose, get structure --------------------
+	cvi* shdwMaskMRF = cvlic("_mask_mrf.png");
 	cvi* shdwMask = NULL;
-	MRFProc mProc;
-	mProc.SolveWithInitial(src, src2, initMask, initCfdc, 64, shdwMask);
-	cvsic("_mask_3res.png", shdwMask, 0);
-	cvri(initMask); cvri(initCfdc);
+	DecmpsProc dProc;
+	dProc.Analysis(src, shdwMaskMRF, shdwMask);
+	cvsic("_mask_4res.png", shdwMask, 0);
+	cvri(shdwMaskMRF);
 
 	//------------------- step 4 : Recover ------------------------------------
 	cvsi("_src.png", src);
@@ -60,6 +74,7 @@ int _tmain(int argc, _TCHAR* argv[])
 	}
 	cvCvtColor(src2, src, CV_HLS2BGR_FULL);
 	cvsi("_src_rev.png", src);
+	cvri(shdwMask);
 
 	cvri(src);
 	cvri(src2);

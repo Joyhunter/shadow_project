@@ -42,6 +42,9 @@
     <ClInclude Include="mrf_proc.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="decmps_proc.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp">
@@ -60,6 +63,9 @@
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="mrf_proc.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="decmps_proc.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>
