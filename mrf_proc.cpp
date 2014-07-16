@@ -28,7 +28,7 @@ float MRFProc::GetDataCost(int idx, int label)
 
 	// dataCost = |res_i - prior_i| * 1;      0 ~ 1
 	float v = _f cvg20(s_proc->m_initMask, x, y) / 255.0f;
-	v = fabs(pow(v - GetValueFromLabel(label), 1.0f));
+	v = fabs(pow(v - GetValueFromLabel(label), 2.0f));
 
 	float cfdc = _f cvg2(s_proc->m_initCfdc, x, y).val[0] / 255.0f;
 	float cfdcTerm = _f gaussian(cfdc, 1.0f, 0.5f);
@@ -42,7 +42,7 @@ float MRFProc::GetSmoothCost(int idx1, int idx2, int label1, int label2)
 
 	//global smoothness
 	float alpha1 = GetValueFromLabel(label1), alpha2 = GetValueFromLabel(label2);
-	float v = fabs(pow(alpha1 - alpha2, 1.0f));
+	float v = fabs(pow(alpha1 - alpha2, 2.0f));
 
 	//affinity
 	int x1 = idx1 / (s_proc->m_width), y1 = idx1 % (s_proc->m_width);
@@ -91,10 +91,83 @@ void MRFProc::SolveWithInitial(IN cvi* src, IN cvi* srcHLS, IN cvi* initMask,
 	doFcvi(shdwMask, i, j)
 	{
 		cvS s = cvg2(shdwMask, i, j);
-		s.val[0] = mrf->getLabel(i * m_width + j) * 255 / nLabels;
+		s.val[0] = GetValueFromLabel(mrf->getLabel(i * m_width + j)) * 255;
 		cvs2(shdwMask, i, j, s);
 	}
 	
+	delete mrf;
+
+}
+
+
+float MRFProc::GetDataCostGdc(int idx, int label)
+{
+	int x = idx / (s_proc->m_width), y = idx % (s_proc->m_width);
+
+	float v = _f cvg20(s_proc->m_gdcMask, x, y) / 255.0f;
+	float vI = _f cvg20(s_proc->m_initMask, x, y) / 255.0f;
+	float vP = GetValueFromLabel(label);
+	float res1 = fabs(pow(v - vP, 2.0f)), res2 = fabs(pow(vI - vP, 2.0f));
+
+	float weight = _f gaussian(v / vI, 1.2, 0.05);
+	if(v / vI > 1.2) weight = 1;
+	float weight2 = _f gaussian(v, 0.95, 0.1);
+	if(v > 0.95) weight2 = 1;
+	weight = clamp(weight * (5*weight2 + 1), 0.f, 1.f);
+
+	return res1*weight + res2*(1-weight);
+}
+
+float MRFProc::GetSmoothCostGdc(int idx1, int idx2, int label1, int label2)
+{
+	//global smoothness
+	float alpha1 = GetValueFromLabel(label1), alpha2 = GetValueFromLabel(label2);
+	float v = fabs(pow(alpha1 - alpha2, 2.0f));
+
+	//affinity
+	int x1 = idx1 / (s_proc->m_width), y1 = idx1 % (s_proc->m_width);
+	int x2 = idx2 / (s_proc->m_width), y2 = idx2 % (s_proc->m_width);
+	cvS s1 = cvg2(s_proc->m_src, x1, y1) / 255.0f;
+	cvS s2 = cvg2(s_proc->m_src, x2, y2) / 255.0f;
+	float affinity = _f gaussian(_f colorDist(s1, s2), 0.f, 0.2f);
+
+	return v * affinity * 5;
+}
+
+void MRFProc::SolveWithInitAndGidc(IN cvi* src, IN cvi* initMask, IN cvi* gdcMask, IN int nLabels, 
+	OUT cvi* &shdwMask)
+{
+	s_proc = this;
+	m_width = src->width;
+	m_height = src->height;
+	m_nLabels = nLabels;
+	m_src = src;
+	m_initMask = initMask;
+	m_gdcMask = gdcMask;
+
+	DataCost *data = new DataCost(MRFProc::GetDataCostGdc);
+	SmoothnessCost *smooth = new SmoothnessCost(MRFProc::GetSmoothCostGdc);
+	EnergyFunction *eng = new EnergyFunction(data,smooth);
+
+	float timeCost;
+	MRF* mrf = new Expansion(m_width, m_height, nLabels, eng); // Expansion Swap MaxProdBP
+	mrf->initialize();  
+	mrf->clearAnswer();
+	mrf->optimize(5, timeCost); 
+
+	MRF::EnergyVal E_smooth = mrf->smoothnessEnergy();
+	MRF::EnergyVal E_data = mrf->dataEnergy();
+	printf("Total Energy = %d (Smoothness energy %d, Data Energy %d)\n", 
+		E_smooth+E_data,E_smooth,E_data);
+
+	shdwMask = cvci(initMask);
+	doFcvi(shdwMask, i, j)
+	{
+		cvS s = cvg2(shdwMask, i, j);
+		s.val[0] = GetValueFromLabel(mrf->getLabel(i * m_width + j)) * 255;
+		cvs2(shdwMask, i, j, s);
+	}
+
 	delete mrf;
 
 }
