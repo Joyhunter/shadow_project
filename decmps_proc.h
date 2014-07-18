@@ -52,15 +52,19 @@ public:
 	DecmpsProc(void);
 	~DecmpsProc(void);
 
-	void Analysis(IN cvi* src, IN cvi* maskMRF, OUT cvi* &shdwMask);
+	void Analysis(IN cvi* src, IN cvi* maskMRF, OUT cvi* &shdwMask, 
+		IN float peekRatio = 1.0f, IN float boundRadius = 0.1f, IN int nLabels = 64);
 
 private:
 
 	void ComputeHist(IN cvi* mask, OUT Hist& hist);
-	void GetPeeks(Hist& hist, vector<int>& peeks, float minValue = 0.2f, float minGap = 5.0f);
+	void GetPeeks(Hist& hist, vector<int>& peeks, float minValue = 0.2f, float minRatio = 1.0f);
+	void GetPeeksNorm(vector<int>& peeks, int N = 20);
 	void ShowHistInCvi(IN Hist& hist, IN vector<int>& peeks, float heightRatio, string fileDir);
 
 	void Quantify(cvi* maskMRF, vector<int>& peeks, Strt& strt);
 	void ShowStrtImg(Strt& strt, string fileDir);
+
+	cvi* GetBounaryMask(cvi* mask, int r);
 };
 

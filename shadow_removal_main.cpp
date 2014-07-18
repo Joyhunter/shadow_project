@@ -6,15 +6,21 @@
 
 int _tmain(int argc, _TCHAR* argv[])
 {
-	string fileName = "1_small"; //1_small 7_test
+	string fileName = "1"; //1_small 7_test
+	int step = 3;
 
-	cvi* src = cvlic(("images//" + fileName + ".png").c_str());
+	cvi* srcOri = cvlic(("images//" + fileName + ".png").c_str()); // 600*450
+	int downRatio = 3; 
+	cvi* src = cvci83(srcOri->width / downRatio, srcOri->height / downRatio); //200*150
+	cvResize(srcOri, src);
+	cvi* src2Ori = cvci(srcOri);
+	cvCvtColor(srcOri, src2Ori, CV_BGR2HLS_FULL);
 	cvi* src2 = cvci(src);
 	cvCvtColor(src, src2, CV_BGR2HLS_FULL);
 
 	//------------------- step 1 : patch match --------------------------------
-	int gridSize = 56;//45;//41;//45;
-	int gridOffset = 50;//39;//35;//39;
+	int gridSize = _i(src->width * 0.28f);//56;//45;//41;//45;
+	int gridOffset = _i(src->width * 0.25f);//50;//39;//35;//39;
 	int patchSize = 7;
 	string corrFileName = "images//corr//" + fileName + "_" + toStr(gridSize) 
 		+ "_" + toStr(gridOffset) + "_" + toStr(patchSize) + "_full_test2.txt";
@@ -23,61 +29,71 @@ int _tmain(int argc, _TCHAR* argv[])
 	GridGPMProc proc(&metric2, gridSize, gridOffset, 1, patchSize, 30);
 	proc.SetROI(cvRect(0, 0, src->width, src->height));
 
-	if(0)
+	if(step <= 0)
 	{
 		proc.RunGridGPMMultiScale(src2, corrFileName, 2, 1);
-		proc.ShowGPMResUI(src, src2, corrFileName, 80);
+		//proc.ShowGPMResUI(src, src2, corrFileName, 80);
 	}
 
 	//------------------- step 2 : voting  ------------------------------------
-	if(0)
+	if(step <= 1)
 	{
 		cvi* initMask = NULL, *initCfdc = NULL; 
 		VoteProc vProc;
 		vProc.LoadCorrs(corrFileName);
 		vProc.Vote(src2, initMask, initCfdc, 80, 0.5f); //80/0.5 80/1.0 
-		cvsic("_mask_2postprocess.png", initMask, 0);
-		cvsi("_mask_init.png", initMask);
-		cvsi("_cnfdc_init.png", initCfdc);
+		cvsic("_mask_2voting.png", initMask, 0);
+		cvsi("_ex_mask_voting.png", initMask);
+		cvsi("_ex_cnfdc_voting.png", initCfdc);
 		cvri(initMask); cvri(initCfdc);
 	}
 
 	//------------------- step 3 : MRF ----------------------------------------
-	if(0)
+	if(step <= 2)
 	{
-		cvi* initMask = cvli("_mask_init.png");
-		cvi* initCfdc = cvli("_cnfdc_init.png");
-		//cvi* shdwMask = cvli("_mask_init.png");
+		cvi* initMask = cvli("_ex_mask_voting.png");
+		cvi* initCfdc = cvlig("_ex_cnfdc_voting.png");
 		cvi* shdwMaskMRF = NULL;
 		MRFProc mProc;
-		mProc.SolveWithInitial(src, src2, initMask, initCfdc, 256, shdwMaskMRF);
-		cvsic("_mask_3res.png", shdwMaskMRF, 0);
-		cvsi("_mask_mrf.png", shdwMaskMRF);
-		cvri(initMask); cvri(initCfdc); cvri(shdwMaskMRF);
+		mProc.SolveWithInitial(src, src, initMask, initCfdc, 64, shdwMaskMRF);
+
+		cvi* shdwMaskMRFOri = cvci83(srcOri);
+		cvResize(shdwMaskMRF, shdwMaskMRFOri);
+
+		cvsic("_mask_3mrf.png", shdwMaskMRFOri, 0);
+		cvsi("_ex_mask_mrf.png", shdwMaskMRFOri);
+
+		cvri(initMask); cvri(initCfdc);
+		cvri(shdwMaskMRFOri);cvri(shdwMaskMRF);
 	}
 
 	//------------------- step 4: decompose, get structure --------------------
-	cvi* shdwMaskMRF = cvlic("_mask_mrf.png");
+	cvi* shdwMaskMRF = cvlic("_ex_mask_mrf.png");
 	cvi* shdwMask = NULL;
 	DecmpsProc dProc;
-	dProc.Analysis(src, shdwMaskMRF, shdwMask);
-	cvsic("_mask_4res.png", shdwMask, 0);
+	//peeks number: 0.8~0.9~1.0  bigger: less regions
+	//soft boundary radius: 0.05~0.1~0.15  radius * src->width
+	dProc.Analysis(srcOri, shdwMaskMRF, shdwMask, 0.9f, 0.1f, 64);
+	cvsic("_mask_4result.png", shdwMask, 0);
 	cvri(shdwMaskMRF);
 
-	//------------------- step 4 : Recover ------------------------------------
-	cvsi("_src.png", src);
-	doFcvi(src, i, j)
+	//------------------- step 5 : Recover ------------------------------------
+	cout<<"Recovery...";
+	cvsi("_src.png", srcOri);
+	doFcvi(srcOri, i, j)
 	{
-		auto v = cvg2(src2, i, j);
+		auto v = cvg2(src2Ori, i, j);
 		cvS alpha = cvg2(shdwMask, i, j) / 255.0;
-		cvs2(src2, i, j, cvs(v.val[0], v.val[1] / alpha.val[0], v.val[2] / alpha.val[1]));
+		alpha.val[1] = 1;
+		cvs2(src2Ori, i, j, cvs(v.val[0], v.val[1] / alpha.val[0], v.val[2] / alpha.val[1]));
 	}
-	cvCvtColor(src2, src, CV_HLS2BGR_FULL);
-	cvsi("_src_rev.png", src);
+	cvCvtColor(src2Ori, srcOri, CV_HLS2BGR_FULL);
+	cvsi("_src_rev.png", srcOri);
 	cvri(shdwMask);
+	cout<<"\rRecovery complete."<<endl;
 
-	cvri(src);
-	cvri(src2);
+	cvri(src); cvri(src2);
+	cvri(srcOri); cvri(src2Ori);
 	return 0;
 }
 

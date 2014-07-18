@@ -72,6 +72,8 @@ void MRFProc::SolveWithInitial(IN cvi* src, IN cvi* srcHLS, IN cvi* initMask,
 	m_initMask = initMask;
 	m_initCfdc = initCfdc;
 
+	cout<<"Solving MRF system...";
+
 	DataCost *data = new DataCost(MRFProc::GetDataCost);
 	SmoothnessCost *smooth = new SmoothnessCost(MRFProc::GetSmoothCost);
 	EnergyFunction *eng = new EnergyFunction(data,smooth);
@@ -84,8 +86,7 @@ void MRFProc::SolveWithInitial(IN cvi* src, IN cvi* srcHLS, IN cvi* initMask,
 
 	MRF::EnergyVal E_smooth = mrf->smoothnessEnergy();
 	MRF::EnergyVal E_data = mrf->dataEnergy();
-	printf("Total Energy = %d (Smoothness energy %d, Data Energy %d)\n", 
-		E_smooth+E_data,E_smooth,E_data);
+	cout<<"\rSolving MRF complete ( E_Smooth = "<<E_smooth<<", E_data = "<<E_data<<" ).\n";
 	
 	shdwMask = cvci(initMask);
 	doFcvi(shdwMask, i, j)
@@ -111,9 +112,14 @@ float MRFProc::GetDataCostGdc(int idx, int label)
 
 	float weight = _f gaussian(v / vI, 1.2, 0.05);
 	if(v / vI > 1.2) weight = 1;
-	float weight2 = _f gaussian(v, 0.95, 0.1);
-	if(v > 0.95) weight2 = 1;
-	weight = clamp(weight * (5*weight2 + 1), 0.f, 1.f);
+	if(v == 255) weight = 1;
+	
+	//weight = 0;
+	//if(cvg20(s_proc->m_boundmask, x, y) == 0) weight = 1;
+
+	//float weight2 = _f gaussian(v, 0.95, 0.1);
+	//if(v > 0.95) weight2 = 1;
+	//weight = clamp(weight * (weight2 + 1), 0.f, 1.f);
 
 	return res1*weight + res2*(1-weight);
 }
@@ -131,11 +137,11 @@ float MRFProc::GetSmoothCostGdc(int idx1, int idx2, int label1, int label2)
 	cvS s2 = cvg2(s_proc->m_src, x2, y2) / 255.0f;
 	float affinity = _f gaussian(_f colorDist(s1, s2), 0.f, 0.2f);
 
-	return v * affinity * 5;
+	return v * 5;
 }
 
-void MRFProc::SolveWithInitAndGidc(IN cvi* src, IN cvi* initMask, IN cvi* gdcMask, IN int nLabels, 
-	OUT cvi* &shdwMask)
+void MRFProc::SolveWithInitAndGidc(IN cvi* src, IN cvi* initMask, IN cvi* gdcMask, IN cvi* boundMask, 
+	IN int nLabels, OUT cvi* &shdwMask)
 {
 	s_proc = this;
 	m_width = src->width;
@@ -144,6 +150,9 @@ void MRFProc::SolveWithInitAndGidc(IN cvi* src, IN cvi* initMask, IN cvi* gdcMas
 	m_src = src;
 	m_initMask = initMask;
 	m_gdcMask = gdcMask;
+	m_boundmask = boundMask;
+
+	//cout<<"Solving MRF system...";
 
 	DataCost *data = new DataCost(MRFProc::GetDataCostGdc);
 	SmoothnessCost *smooth = new SmoothnessCost(MRFProc::GetSmoothCostGdc);
@@ -157,8 +166,7 @@ void MRFProc::SolveWithInitAndGidc(IN cvi* src, IN cvi* initMask, IN cvi* gdcMas
 
 	MRF::EnergyVal E_smooth = mrf->smoothnessEnergy();
 	MRF::EnergyVal E_data = mrf->dataEnergy();
-	printf("Total Energy = %d (Smoothness energy %d, Data Energy %d)\n", 
-		E_smooth+E_data,E_smooth,E_data);
+	//cout<<"\rSolving MRF complete ( E_Smooth = "<<E_smooth<<", E_data = "<<E_data<<" ).\n";
 
 	shdwMask = cvci(initMask);
 	doFcvi(shdwMask, i, j)

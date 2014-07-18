@@ -89,7 +89,7 @@ void VoteProc::Vote(cvi* src, OUT cvi* &mask, OUT cvi* &cfdcMap,
 	}
 	cout<<"\rVoting complete.\n";
 
-	cvsi("_test.png", _test);
+	//cvsi("_test.png", _test);
 	
 	cfdcMap = cvci81(m_width, m_height);
 	cvSet(cfdcMap, cvs(0));

@@ -8,7 +8,7 @@ public:
 
 	void SolveWithInitial(IN cvi* src, IN cvi* srcHLS, IN cvi* initMask, IN cvi* initCfdc,
 		IN int nLabels, OUT cvi* &shdwMask);
-	void SolveWithInitAndGidc(IN cvi* src, IN cvi* initMask, IN cvi* gdcMask, IN int nLabels, 
+	void SolveWithInitAndGidc(IN cvi* src, IN cvi* initMask, IN cvi* gdcMask, IN cvi* boundMask, IN int nLabels, 
 		OUT cvi* &shdwMask);
 
 private:
@@ -29,7 +29,7 @@ private:
 	int m_nLabels;
 
 	cvi* m_src, *m_srcHLS, *m_initMask, *m_initCfdc;
-	cvi* m_gdcMask;
+	cvi* m_gdcMask, *m_boundmask;
 	
 
 };

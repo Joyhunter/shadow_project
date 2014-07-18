@@ -6,46 +6,94 @@ DecmpsProc::DecmpsProc(void){}
 
 DecmpsProc::~DecmpsProc(void){}
 
-void DecmpsProc::Analysis(IN cvi* src, IN cvi* maskMRF, OUT cvi* &shdwMask)
+void DecmpsProc::Analysis(IN cvi* src, IN cvi* maskMRF, OUT cvi* &shdwMask, 
+	IN float peekRatio, IN float boundRadius, IN int nLabels)
 {
+	cout<<"Decomposing...\n";
 	shdwMask = cvci(maskMRF);
 
 	//histogram analysis
-	Hist hist(128, 0);
+	Hist hist(64, 0);
 	ComputeHist(maskMRF, hist);
 	vector<int> peeks(0);
-	GetPeeks(hist, peeks, 0.2f, 0.0f);
+	GetPeeks(hist, peeks, 0.2f, peekRatio);
+	//GetPeeksNorm(peeks, 10);
 	ShowHistInCvi(hist, peeks, 0.1f, "decmp_hist.png");
 
 	//quantify
 	Strt strt;
 	Quantify(maskMRF, peeks, strt);
+	cout<<"  Quantify using "<<peeks.size()<<" peeks.\n";
 
 	//post-process
-	strt.adjacentRadius = src->width / 50;
+	strt.adjacentRadius = src->width / 50; //50 param2 : adjacent radius
 	strt.UpdateCellProperty(src);
 	strt.Filter();
 	ShowStrtImg(strt, "decmp_strt.png");
 	vector<Region> regions = strt.GetRegion();
-	doFs(i, 1, _i regions.size())
+	cout<<"  Get "<<regions.size()<<" regions.\n";
+	float maxPixel = 0; int maxRegIdx = -1;
+	doFv(i, regions)
 	{
+		if(regions[i].pixelNum > maxPixel)
+		{
+			maxPixel = regions[i].pixelNum;
+			maxRegIdx = i;
+		}
+	}
+	cout<<"  MaxPixelRegIdx is "<<maxRegIdx<<".\n";
+	doFs(i, 0, _i regions.size())
+	{
+		cout<<"  Solving mrf with the "<<i<<"th region...";
 		regions[i].EstmtAlpha(strt.cells, 0.25f);
 		cvi* guidanceAlphaMap = regions[i].GetGidcAlphaMap(strt.strtImg);
 
-		int smoothSize = src->width / 10;
+		int smoothSize = _i (src->width * boundRadius);
 		if(smoothSize % 2 == 0) smoothSize++;
-		cvSmooth(guidanceAlphaMap, guidanceAlphaMap, 2, smoothSize, smoothSize);
+		cvErode(guidanceAlphaMap, guidanceAlphaMap, 0, smoothSize);
+		//cvSmooth(guidanceAlphaMap, guidanceAlphaMap, 2, smoothSize, smoothSize);
 		cvsi("decmp_adjReg_" + toStr(i) + ".png", guidanceAlphaMap);
 
-		cvi* resMask;
-		MRFProc mProc;
-		mProc.SolveWithInitAndGidc(src, maskMRF, guidanceAlphaMap, 64, resMask);
+		if(i == maxRegIdx)
+		{
+			cvi* boundMask = GetBounaryMask(guidanceAlphaMap, smoothSize);
+			//cvsi(boundMask);
 
-		cvCopy(resMask, shdwMask);
+			cvi* resMask;
+			MRFProc mProc;
+			mProc.SolveWithInitAndGidc(src, maskMRF, guidanceAlphaMap, boundMask, nLabels, resMask);
+			cvCopy(resMask, shdwMask);
+			cvri(resMask);
+			cvri(boundMask);
+		}
+
 		cvri(guidanceAlphaMap);
-		cvri(resMask);
-		return;
+		cout<<"\r  Solving mrf with the "<<i<<"th region complete.\n";
 	}
+}
+
+
+cvi* DecmpsProc::GetBounaryMask(cvi* mask, int r)
+{
+	cvi* res = cvci(mask); 
+	cvZero(res);
+	doFcvi(mask, i, j)
+	{
+		if(cvg20(mask, i, j) != 255) 
+			cvs20(res, i, j, 255);
+	}
+	cvi* res2 = cvci(res);
+	//cvErode(res, res, 0, r);
+	cvDilate(res2, res2, 0, r);
+	doFcvi(res, i, j)
+	{
+		if(cvg20(res2, i, j) > 0 && cvg20(res, i, j) == 0)
+			cvs20(res, i, j, 255);
+		else
+			cvs20(res, i, j, 0);
+	}
+	cvri(res2);
+	return res;
 }
 
 void Region::EstmtAlpha(vector<Cell>& cells, float ratio)
@@ -99,9 +147,11 @@ vector<Region> Strt::GetRegion()
 		if(cells[i].legal == false || used[i] == true) continue;
 		
 		Region r;
+		r.pixelNum = 0;
 		queue<int> idxs;
 		idxs.push(i);
 		r.cellIdx.push_back(i);
+		r.pixelNum += cells[i].pixelNum;
 		used[i] = true;
 		while(!idxs.empty())
 		{
@@ -115,6 +165,7 @@ vector<Region> Strt::GetRegion()
 				if(cells[idxAd].legal == false && cells[idxAd].avgV > cells[idx].avgV) continue;
 				idxs.push(idxAd);
 				r.cellIdx.push_back(idxAd);
+				r.pixelNum += cells[idxAd].pixelNum;
 				used[idxAd] = true;
 			}
 		}
@@ -278,12 +329,11 @@ void DecmpsProc::Quantify(cvi* maskMRF, vector<int>& peeks, Strt& strt)
 
 }
 
-void DecmpsProc::GetPeeks(Hist& hist, vector<int>& peeks, float minValue, float minGap)
+void DecmpsProc::GetPeeks(Hist& hist, vector<int>& peeks, float minValue, float minRatio)
 {
 	int histN = hist.size();
 
 	vector<pair<float, int> > peekOri;
-	float minRatio = 1.0f;
 	doF(i, histN)
 	{
 		if((i == 0 || hist[i] > hist[i-1] * minRatio)
@@ -303,6 +353,15 @@ void DecmpsProc::GetPeeks(Hist& hist, vector<int>& peeks, float minValue, float 
 			peeks.push_back(peekOri[i].second);
 	}
 
+}
+
+void DecmpsProc::GetPeeksNorm(vector<int>& peeks, int N)
+{
+	peeks.resize(N);
+	doF(i, N)
+	{
+		peeks[i] = 255 * i / (N-1);
+	}
 }
 
 void DecmpsProc::ComputeHist(IN cvi* mask, OUT Hist& hist)

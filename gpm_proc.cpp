@@ -554,7 +554,7 @@ void GridGPMProc::RunGridGPM(cvi* src, DenseCorrBox2D& box, bool initValue)
 	{
 		int i = k / nGridw;
 		int j = k % nGridw;
-		cout<<"\rProcessing grid ("<<i<<", "<<j<<")";
+		cout<<"\rPatch-match processing grid ("<<i<<", "<<j<<")";
 		int gridW = _i wInts[j].max - _i wInts[j].min, gridH = _i hInts[i].max - _i hInts[i].min;
 
 		cvi* gpmSrc = cvci83(gridW, gridH);
@@ -608,6 +608,7 @@ void GridGPMProc::RunGridGPMMultiScale(cvi* src, string saveFile, int rat, int l
 		box.LevelUp(downRatio);
 		//box.ShowCorr("temp2.png");
 	}
+	cout<<"\rPatch match complete.\n";
 
 	box.Save(saveFile);
 
