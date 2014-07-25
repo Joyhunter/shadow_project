@@ -10,7 +10,7 @@ TexonAnysProc::~TexonAnysProc(void)
 }
 
 
-float Filter::Conv(cvi* img, int i_, int j_)
+float Filter::Conv(cvi* img, int i_, int j_, int ch)
 {
 	float res = 0;
 	int s = -(r-1)/2;
@@ -22,46 +22,204 @@ float Filter::Conv(cvi* img, int i_, int j_)
 		else if(_r > img->height - 1) _r = img->height*2-2-_r;
 		if(_c < 0) _c = -_c;
 		else if(_c > img->width - 1) _c = img->width*2-2-_c; //cout<<_r<<" "<<_c<<" "<<i-s<<" "<<j-s<<endl;
-		res += _f cvg20(img, _r, _c) * weights[i-s-i_][j-s-j_];
+		res += _f cvg2(img, _r, _c).val[ch] * weights[i-s-i_][j-s-j_];
 	}
 	return res;
 }
 
-cvi* TexonAnysProc::TexonAnalysis(cvi* image)
+void Filter::Visualize()
+{
+	int a = 10;
+	cvi* res = cvci81(r*a, r*a);
+	float minV = 1e10, maxV = -1e10;
+	doF(i, r) doF(j, r)
+	{
+		if(weights[i][j] < minV) minV = weights[i][j];
+		if(weights[i][j] > maxV) maxV = weights[i][j];
+	}
+
+	doFcvi(res, i, j)
+	{
+		int v = _i((weights[i/a][j/a] - minV) / (maxV - minV) * 255);
+		cvs20(res, i, j, v);
+	}
+	cvsi(res);
+	cvri(res);
+}
+
+//use omp
+cvi* TexonAnysProc::GetDensityImg(cvi* image, int ch)
+{
+	int nScales = 4;
+
+	vector<float> r(nScales), log_r(nScales);
+	doFv(i, r) r[i] = _f i + 2;
+	doFv(i, r) log_r[i] = log(r[i]) / log(10.f);
+
+	float log_r_sum = 0;
+	doF(k, nScales) log_r_sum += log_r[k];
+	log_r_sum /= nScales;
+	doF(k, nScales) log_r[k] -= log_r_sum;
+	float len = 0;
+	doF(k, nScales) len += sqr(log_r[k]);
+
+	cvi* res = cvci321(image);
+
+	omp_set_num_threads(6);
+#pragma omp parallel for
+	doFcvi(image, i, j)
+	{
+		vector<float> log_mus(nScales);
+		doF(k, nScales)
+		{
+			float mu = 0;
+
+			bool useGau = false;
+			int rk = _i(_f r[k]*(useGau?2.f:1.0f));
+			doFs(oi, -rk, rk) doFs(oj, -rk, rk)
+			{
+				if(useGau)
+					mu += max2(_f cvg2(image, i+oi, j+oj).val[ch], 1.0f) * _f gaussianNormalize(distEulerL1(oi, oj, 0, 0), r[k], r[k] / 2) * sqr(r[k]);
+				else
+					mu += max2(_f cvg2(image, i+oi, j+oj).val[ch], 1.0f);
+			}
+
+			float log_mu = log(mu) / log(10.f);
+			log_mus[k] = log_mu;
+		}
+
+		float log_mu_sum = 0;
+		doF(k, nScales) log_mu_sum += log_mus[k];
+		log_mu_sum /= nScales;
+		doF(k, nScales) log_mus[k] -= log_mu_sum;
+
+		float dd = 0;
+		doF(k, nScales) dd += log_r[k] * log_mus[k];
+
+		float slope = dd / len;
+		cvs20(res, i, j, slope);
+	}
+
+	return res;
+}
+
+//use omp
+void TexonAnysProc::GetTexonImg(IN cvi* image, IN int clusterN, OUT vector<TexDscrptor>& texValues, OUT cvi* &texIdx, int ch)
 {
 	FilterBank fb = FbCreate(8, 0.5, 1, sqrt(2.f), 3);
 	int N = image->width * image->height;
 
 	CvMat* data = cvCreateMat(N, fb.values.size(), CV_32FC1);
+
+	omp_set_num_threads(6);
+#pragma omp parallel for
 	doFcvi(image, i, j)
 	{
 		doFv(k, fb.values)
 		{
-			float res = fb.values[k].Conv(image, i, j);
+			float res = fb.values[k].Conv(image, i, j, ch);
 			data->data.fl[(i*image->width+j)*fb.values.size() + k] = res;
 		}
 	}
 	CvMat* label = cvCreateMat(N, 1, CV_32SC1);
+	cvZero(label);
 
-	int clusterN = 128;
 	cvKMeans2(data, clusterN, label, cvTermCriteria(CV_TERMCRIT_ITER, 10, 1e-30), 3);
 
-	vector<cvS> ranColors(clusterN);
-	randInit();
-	doF(k, clusterN) ranColors[k] = cvs(rand1()*255.0, rand1()*255.0, rand1()*255.0);
-	cvi* res = cvci83(image);
-	doFcvi(res, i, j)
+	texValues.resize(clusterN);
+	doF(i, clusterN) texValues[i].resize(fb.values.size(), 0);
+	vector<int> pts(clusterN, 0);
+
+	texIdx = cvci81(image);
+	doFcvi(texIdx, i, j)
 	{
-		int idx = label->data.i[i*image->width+j]; //cout<<idx<<" ";
-		cvs2(res, i, j, ranColors[idx]);
+		int pIdx = i*image->width+j;
+		int idx = label->data.i[pIdx];
+		cvs20(texIdx, i, j, idx);
+
+		TexDscrptor& dsp = texValues[idx];
+		pts[idx]++;
+		doF(k, _i fb.values.size())
+			dsp[k] += data->data.fl[pIdx*fb.values.size() + k];
 	}
-	cvsi(res);
-	cvri(res);
+	doF(i, clusterN) doF(k, _i fb.values.size())
+		texValues[i][k] /= max2(pts[i], 1);
 
 	cvReleaseMat(&data);
 	cvReleaseMat(&label);
+}
 
+cvi* TexonAnysProc::TexonAnalysis(cvi* image)
+{
+	int ch = 0;
+
+	//get density map
+	cout<<"Texon: density computing..";
+	cvi* densityMap = GetDensityImg(image, ch);
+
+	cvi* densityVisual = VisualizeDensity(densityMap);
+	cvsi("_texon_density_map.png", densityVisual);
+	cvri(densityVisual);
+
+	//compute texon
+	cout<<"\rTexon: texton computing..";
+	int clusterN = 64;
+	vector<TexDscrptor> texDsps;
+	cvi* texIdxs = NULL;
+	GetTexonImg(densityMap, clusterN, texDsps, texIdxs, 0);
+
+	cvi* texonVisual = VisualizeTexon(texIdxs, clusterN);
+	cvsi("_texon_after_density_map.png", texonVisual);
+	cvri(texonVisual);
+
+
+	GetTexonImg(image, clusterN, texDsps, texIdxs, ch);
+	texonVisual = VisualizeTexon(texIdxs, clusterN);
+	cvsi("_texon_map.png", texonVisual);
+	cvri(texonVisual);
+
+
+	cvri(densityMap);
+	cvri(texIdxs);
+	cout<<"\rTexon: texton computing done.\n";
+	doFv(i, texDsps)
+	{
+		doFv(j, texDsps[i]) cout<<texDsps[i][j]<<" ";
+		cout<<endl;
+	}
 	return NULL;
+}
+
+cvi* TexonAnysProc::VisualizeDensity(cvi* densityMap)
+{
+	cvi* res = cvci81(densityMap);
+	float maxV = -1e20f, minV = 1e20f;
+	doFcvi(densityMap, i, j)
+	{
+		float v = _f cvg20(densityMap, i, j);
+		if(v > maxV) maxV = v;
+		if(v < minV) minV = v;
+	}
+	doFcvi(res, i, j)
+	{
+		float v = _f cvg20(densityMap, i, j);
+		cvs20(res, i, j, (v-minV)*255/(maxV-minV));
+	}
+	return res;
+}
+
+cvi* TexonAnysProc::VisualizeTexon(IN cvi* texIdx, IN int clusterN)
+{
+	vector<cvS> ranColors(clusterN);
+	randInit();
+	doFv(k, ranColors) ranColors[k] = cvs(rand1()*255.0, rand1()*255.0, rand1()*255.0);
+	cvi* res = cvci83(texIdx);
+	doFcvi(res, i, j)
+	{
+		int idx = _i cvg20(texIdx, i, j);
+		cvs2(res, i, j, ranColors[idx]);
+	}
+	return res;
 }
 
 FilterBank TexonAnysProc::FbCreate(int numOrient, float startSigma, int numScales, float scaling, float elong)
@@ -188,22 +346,3 @@ Filter TexonAnysProc::OeFilter(vector<float>& sigma, float support, float theta,
 	return filter;
 }
 
-void Filter::Visualize()
-{
-	int a = 10;
-	cvi* res = cvci81(r*a, r*a);
-	float minV = 1e10, maxV = -1e10;
-	doF(i, r) doF(j, r)
-	{
-		if(weights[i][j] < minV) minV = weights[i][j];
-		if(weights[i][j] > maxV) maxV = weights[i][j];
-	}
-
-	doFcvi(res, i, j)
-	{
-		int v = _i((weights[i/a][j/a] - minV) / (maxV - minV) * 255);
-		cvs20(res, i, j, v);
-	}
-	cvsi(res);
-	cvri(res);
-}

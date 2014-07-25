@@ -6,14 +6,16 @@ struct Filter
 	int r;
 
 	void Visualize();
-	float Conv(cvi* img, int i, int j);
+	float Conv(cvi* img, int i, int j, int ch = 0);
 };
 
 struct FilterBank
 {
-	vector<Filter > values;
+	vector<Filter> values;
 	int oritN, scaleN;
 };
+
+typedef vector<float> TexDscrptor;
 
 class TexonAnysProc
 {
@@ -24,6 +26,14 @@ public:
 	cvi* TexonAnalysis(cvi* image);
 
 private:
+
+	cvi* GetDensityImg(cvi* image, int ch = 0);
+
+	void GetTexonImg(IN cvi* image, IN int clusterN, OUT vector<TexDscrptor>& texValues, OUT cvi* &texIdx, int ch = 0);
+
+	cvi* VisualizeTexon(IN cvi* texIdx, IN int clusterN);
+
+	cvi* VisualizeDensity(cvi* densityMap);
 
 	FilterBank FbCreate(int numOrient = 8, float startSigma = 0.5f, int numScales = 1, float scaling = sqrt(2.0f), float elong = 3.f);
 

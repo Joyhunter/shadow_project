@@ -56,6 +56,8 @@
 #include <sstream>
 using namespace std;
 
+#define PI 3.141592653
+
 /******************* type ************************/
 typedef vector<string> vecS;
 typedef vector<bool> vecB;

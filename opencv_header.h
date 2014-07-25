@@ -69,7 +69,6 @@ using namespace cv;
 #define cvlig(str) cvLoadImage(str, 0)
 #define cvS CvScalar
 #define cvs cvScalar
-#define cvg20(src, i, j) cvGet2D(src, i, j).val[0]
 #define cvs2 cvSet2D
 #define cvs20(src, i, j, v) cvSet2D(src, i, j, cvScalar(v))
 #define cvs23(src, i, j, v) cvSet2D(src, i, j, cvScalar(v, v, v))
@@ -171,8 +170,18 @@ inline cvi* cvci321(int width, int height)
 
 inline cvS cvg2(const cvi* img, int r, int c)
 {
+	if(r < 0) r = -r;
+	else if(r > img->height - 1) r = img->height*2-2-r;
+	if(c < 0) c = -c;
+	else if(c > img->width - 1) c = img->width*2-2-c;
+	r = clamp(r, 0, img->height-1);
+	c = clamp(c, 0, img->width-1);
 	return cvGet2D(img, r, c);
 }
+
+#define cvg20(src, i, j) cvg2(src, i, j).val[0]
+#define cvg21(src, i, j) cvg2(src, i, j).val[1]
+#define cvg22(src, i, j) cvg2(src, i, j).val[2]
 
 #define doFcvi(img, i, j) for (int i = 0;i<img->height;i++) for (int j = 0;j<img->width;j++)
 #define doFcvm(img, i, j) for (int i = 0;i<img.rows;i++) for (int j = 0;j<img.cols;j++)
@@ -383,8 +392,14 @@ inline bool cvIn(T r, T c, T rLow, T rHigh, T cLow, T cHigh)
 
 inline cvS cvg2(const cvi* img, float x, float y)
 {
+	if(x < 0) x = -x;
+	else if(x > img->height - 1) x = img->height*2-2-x;
+	if(y < 0) y = -y;
+	else if(y > img->width - 1) y = img->width*2-2-y;
+
 	x = clamp(x, 0.f, _f img->height-1);
 	y = clamp(y, 0.f, _f img->width-1);
+
 	if(fequal(x, _f round(x)) && fequal(y, _f round(y)))
 	{
 		return cvGet2D(img, round(x), round(y));
