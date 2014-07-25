@@ -112,12 +112,12 @@ float MRFProc::GetDataCostGdc(int idx, int label)
 
 	float weight = _f gaussian(v / vI, 1.2, 0.05);
 	if(v / vI > 1.2) weight = 1;
-	if(v == 255) weight = 1;
+	if(v >= 0.99f) return res1 * 10;
 	
 	//weight = 0;
 	//if(cvg20(s_proc->m_boundmask, x, y) == 0) weight = 1;
 
-	//float weight2 = _f gaussian(v, 0.95, 0.1);
+	float weight2 = _f gaussian(v, 1.0f, 0.1f);
 	//if(v > 0.95) weight2 = 1;
 	//weight = clamp(weight * (weight2 + 1), 0.f, 1.f);
 
@@ -131,17 +131,17 @@ float MRFProc::GetSmoothCostGdc(int idx1, int idx2, int label1, int label2)
 	float v = fabs(pow(alpha1 - alpha2, 2.0f));
 
 	//affinity
-	int x1 = idx1 / (s_proc->m_width), y1 = idx1 % (s_proc->m_width);
-	int x2 = idx2 / (s_proc->m_width), y2 = idx2 % (s_proc->m_width);
-	cvS s1 = cvg2(s_proc->m_src, x1, y1) / 255.0f;
-	cvS s2 = cvg2(s_proc->m_src, x2, y2) / 255.0f;
-	float affinity = _f gaussian(_f colorDist(s1, s2), 0.f, 0.2f);
+// 	int x1 = idx1 / (s_proc->m_width), y1 = idx1 % (s_proc->m_width);
+// 	int x2 = idx2 / (s_proc->m_width), y2 = idx2 % (s_proc->m_width);
+// 	cvS s1 = cvg2(s_proc->m_src, x1, y1) / 255.0f;
+// 	cvS s2 = cvg2(s_proc->m_src, x2, y2) / 255.0f;
+// 	float affinity = _f gaussian(_f colorDist(s1, s2), 0.f, 0.2f);
 
-	return v * 5;
+	return v * 10; //10
 }
 
 void MRFProc::SolveWithInitAndGidc(IN cvi* src, IN cvi* initMask, IN cvi* gdcMask, IN cvi* boundMask, 
-	IN int nLabels, OUT cvi* &shdwMask)
+	IN int nLabels, OUT cvi* &shdwMask, IN int smoothSize)
 {
 	s_proc = this;
 	m_width = src->width;
@@ -162,17 +162,14 @@ void MRFProc::SolveWithInitAndGidc(IN cvi* src, IN cvi* initMask, IN cvi* gdcMas
 	MRF* mrf = new Expansion(m_width, m_height, nLabels, eng); // Expansion Swap MaxProdBP
 	mrf->initialize();  
 	mrf->clearAnswer();
+
 	mrf->optimize(5, timeCost); 
-
-	MRF::EnergyVal E_smooth = mrf->smoothnessEnergy();
-	MRF::EnergyVal E_data = mrf->dataEnergy();
-	//cout<<"\rSolving MRF complete ( E_Smooth = "<<E_smooth<<", E_data = "<<E_data<<" ).\n";
-
 	shdwMask = cvci(initMask);
 	doFcvi(shdwMask, i, j)
 	{
 		cvS s = cvg2(shdwMask, i, j);
 		s.val[0] = GetValueFromLabel(mrf->getLabel(i * m_width + j)) * 255;
+		s.val[2] = s.val[0];
 		cvs2(shdwMask, i, j, s);
 	}
 

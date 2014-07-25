@@ -80,17 +80,20 @@
   <ItemGroup>
     <ClInclude Include="decmps_proc.h" />
     <ClInclude Include="gpm_proc.h" />
+    <ClInclude Include="ivrt_anys_proc.h" />
     <ClInclude Include="lumminance_invarient_descriptor.h" />
     <ClInclude Include="mrf_proc.h" />
     <ClInclude Include="opencv_header.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="stl_header.h" />
     <ClInclude Include="targetver.h" />
+    <ClInclude Include="texon_proc.h" />
     <ClInclude Include="vote_proc.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="decmps_proc.cpp" />
     <ClCompile Include="gpm_proc.cpp" />
+    <ClCompile Include="ivrt_anys_proc.cpp" />
     <ClCompile Include="lumminance_invarient_descriptor.cpp" />
     <ClCompile Include="mrf_proc.cpp" />
     <ClCompile Include="shadow_removal_main.cpp" />
@@ -98,6 +101,7 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
     </ClCompile>
+    <ClCompile Include="texon_proc.cpp" />
     <ClCompile Include="vote_proc.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

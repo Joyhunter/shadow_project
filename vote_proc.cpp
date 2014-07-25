@@ -22,9 +22,47 @@ void VoteProc::LoadCorrs(string fileStr)
 	//cout<<m_width<<" "<<m_height<<endl;
 }
 
-void VoteProc::Vote(cvi* src, OUT cvi* &mask, OUT cvi* &cfdcMap, 
-	float distThres, float distThresRatio)
+
+float VoteProc::EstmtShdwRatio(cvi* src, float distThres)
 {
+	float res = 0;
+	int resN = 0;
+	float shdwSize = 0;
+	doFcvi(src, i, j)
+	{
+		if(j == 0) cout<<"\rVoting: estimating "<<i*100/src->height<<"%.";
+		MultiCorr corrs = m_corrs.GetCorrsPerGrid(i, j);
+		int nPatch = corrs.size();
+
+		Patch patch = PatchDistMetric::GetPatch(src, _f i, _f j, 1.f, 0.f, m_patchOffset);
+		float lmnc = PatchLmncProc::GetAvgLmnc(patch);
+
+		float maxLumc = lmnc;
+		doF(k, nPatch)
+		{
+			Corr& v = corrs[k];
+			if(v.dist > distThres) continue;
+			Patch patch2 = PatchDistMetric::GetPatch(src, v.x, v.y, v.s, v.r, 
+				m_patchOffset);
+			float lmnc2 = PatchLmncProc::GetAvgLmnc(patch2);
+			if(lmnc2 > maxLumc) maxLumc = lmnc2;
+		}
+		maxLumc += 1e-5f;
+		res += lmnc / maxLumc;
+		if(lmnc / maxLumc < 0.8) shdwSize++; 
+		resN++;
+	}
+	return shdwSize / src->width / src->height; // 0.46 0.28
+	//return res/resN; //0.84 0.83
+}
+
+void VoteProc::Vote(cvi* src, OUT cvi* &mask, OUT cvi* &cfdcMap, 
+	float distThres)
+{
+	float shadowRatio = EstmtShdwRatio(src, distThres);
+	float distThresRatio = clamp(2*shadowRatio, 0.3f, 1.0f);
+	cout<<"\rVoting: estimate shadow ratio = "<<shadowRatio<<". Patch thres ratio = "<<distThresRatio<<".\n";
+
 	mask = cvci323(m_width, m_height);
 	cvZero(mask);
 

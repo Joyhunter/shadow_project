@@ -7,7 +7,7 @@ DecmpsProc::DecmpsProc(void){}
 DecmpsProc::~DecmpsProc(void){}
 
 void DecmpsProc::Analysis(IN cvi* src, IN cvi* maskMRF, OUT cvi* &shdwMask, 
-	IN float peekRatio, IN float boundRadius, IN int nLabels)
+	IN float peekRatio, IN int nLabels)
 {
 	cout<<"Decomposing...\n";
 	shdwMask = cvci(maskMRF);
@@ -44,24 +44,26 @@ void DecmpsProc::Analysis(IN cvi* src, IN cvi* maskMRF, OUT cvi* &shdwMask,
 	cout<<"  MaxPixelRegIdx is "<<maxRegIdx<<".\n";
 	doFs(i, 0, _i regions.size())
 	{
-		cout<<"  Solving mrf with the "<<i<<"th region...";
+		cout<<"  Solving mrf with the "<<i<<"th region, ";
 		regions[i].EstmtAlpha(strt.cells, 0.25f);
 		cvi* guidanceAlphaMap = regions[i].GetGidcAlphaMap(strt.strtImg);
+		int smoothSize = GetSmoothSize(maskMRF, guidanceAlphaMap, 3); 
 
-		int smoothSize = _i (src->width * boundRadius);
-		if(smoothSize % 2 == 0) smoothSize++;
-		cvErode(guidanceAlphaMap, guidanceAlphaMap, 0, smoothSize);
-		//cvSmooth(guidanceAlphaMap, guidanceAlphaMap, 2, smoothSize, smoothSize);
+		cout<<"boundary width is "<<smoothSize;
 		cvsi("decmp_adjReg_" + toStr(i) + ".png", guidanceAlphaMap);
 
 		if(i == maxRegIdx)
 		{
 			cvi* boundMask = GetBounaryMask(guidanceAlphaMap, smoothSize);
-			//cvsi(boundMask);
 
 			cvi* resMask;
 			MRFProc mProc;
-			mProc.SolveWithInitAndGidc(src, maskMRF, guidanceAlphaMap, boundMask, nLabels, resMask);
+			mProc.SolveWithInitAndGidc(src, maskMRF, guidanceAlphaMap, boundMask, nLabels, resMask, smoothSize);
+			cvsic("_mask_4decop.png", resMask, 0);
+			cvsi("_ex_mask_decop.png", shdwMask);
+			shdwMask = cvlic("_ex_mask_decop.png");
+
+			SmoothBoundary(maskMRF, guidanceAlphaMap, resMask, smoothSize);
 			cvCopy(resMask, shdwMask);
 			cvri(resMask);
 			cvri(boundMask);
@@ -72,6 +74,93 @@ void DecmpsProc::Analysis(IN cvi* src, IN cvi* maskMRF, OUT cvi* &shdwMask,
 	}
 }
 
+void DecmpsProc::SmoothBoundary(cvi* maskMRF, cvi* gdcMask, cvi* &resMask, int smoothSize)
+{
+	cvi* temp = cvci81(maskMRF);
+	doFcvi(temp, i, j)
+	{
+		if(cvg20(gdcMask, i, j) < 255)
+			cvs20(temp, i, j, 255);
+		else
+			cvs20(temp, i, j, 0);
+	}
+	if(smoothSize % 2 == 0) smoothSize++;
+	cvSmooth(temp, temp, CV_GAUSSIAN, smoothSize, smoothSize);
+	cvi* shdwMask = cvci(resMask);
+	cvSmooth(shdwMask, shdwMask, CV_BLUR, smoothSize, smoothSize);
+	doFcvi(resMask, i, j)
+	{
+		float alpha = _f cvg20(temp, i, j) / 255.0f;
+		alpha = clamp(alpha*2 - 1, 0.0f, 1.0f);
+		cvS s = cvg2(resMask, i, j);
+		cvS s2 = cvg2(shdwMask, i, j);
+		s = s * alpha + s2 * (1.0f-alpha);
+		cvs2(resMask, i, j, s);
+	}
+	//cvsic("autoS.png", shdwMask2);
+	//cvsi(temp);
+	cvri(shdwMask);
+	cvri(temp);
+}
+
+bool operator < (const CvPoint& v1, const CvPoint& v2)
+{
+	if(v1.x < v2.x) return true;
+	else return (v1.y < v2.y);
+}
+bool operator == (const CvPoint& v1, const CvPoint& v2)
+{
+	return (v1.x == v2.x) && (v1.y == v2.y);
+}
+
+int DecmpsProc::GetSmoothSize(cvi* maskMRF, cvi* &guidanceAlphaMap, int pixelStep)
+{
+	set<CvPoint> bps;
+	int alpha = 0;
+	int radius = pixelStep;
+	doFcvi(guidanceAlphaMap, i, j)
+	{
+		if(cvg20(guidanceAlphaMap, i, j) == 255) continue;
+		alpha = _i cvg20(guidanceAlphaMap, i, j);
+		doFs(oi, -radius, radius) doFs(oj, -radius, radius)
+		{
+			if(cvIn(i+oi, j+oj, guidanceAlphaMap) && cvg20(guidanceAlphaMap, i+oi, j+oj) == 255) 
+				bps.insert(cvPoint(i+oi, j+oj));
+		}
+	}
+	if(bps.size() == 0) return 0;
+
+	float avgShdwBak = 0;
+	int res = 0;
+	while(1)
+	{
+		float avgShdw = 0;
+		for(auto p = bps.begin(); p != bps.end(); p++)
+		{
+			avgShdw += _f cvg20(maskMRF, p->x, p->y);
+			cvs20(guidanceAlphaMap, p->x, p->y, alpha);
+		}
+		avgShdw /= bps.size();
+		//cout<<avgShdw<<endl;
+
+		set<CvPoint> bps2 = bps;
+		bps.clear();
+		for(auto p = bps2.begin(); p != bps2.end(); p++)
+		{
+			int i = p->x, j = p->y;
+			doFs(oi, -radius, radius) doFs(oj, -radius, radius)
+			{
+				if(cvIn(i+oi, j+oj, guidanceAlphaMap) && cvg20(guidanceAlphaMap, i+oi, j+oj) == 255) 
+					bps.insert(cvPoint(i+oi, j+oj));
+			}
+		}
+
+		if(bps.size() == 0) return res;
+		if(avgShdw <= avgShdwBak) return res;
+		res += radius;
+		avgShdwBak = avgShdw;
+	}
+}
 
 cvi* DecmpsProc::GetBounaryMask(cvi* mask, int r)
 {
@@ -244,7 +333,7 @@ void Strt::Filter()
 	//avgLuminance > 230
 	doFv(i, cells)
 	{
-		if(cells[i].avgV > 200) cells[i].legal = false;
+		if(cells[i].avgV > 200) cells[i].legal = false; // 200
 		if(cells[i].pixelNum < 0.4) cells[i].legal = false;
 		if(cells[i].ratio < 0.2) cells[i].legal = false;
 		//if(cells[i].edgeWeight > 0.6) cells[i].legal = false;
@@ -344,8 +433,13 @@ void DecmpsProc::GetPeeks(Hist& hist, vector<int>& peeks, float minValue, float 
 			peekOri.push_back(make_pair(hist[i], _i peek));
 		}
 	}
+	if(peekOri.size() <= 3)
+	{
+		doFv(i, peekOri) peeks.push_back(peekOri[i].second);
+		return;
+	}
 
-	minRatio = 0.85f;
+	//minRatio = 0.85f;
 	doFv(i, peekOri)
 	{
 		if((i == 0 || peekOri[i].first > peekOri[i-1].first * minRatio)
@@ -371,7 +465,7 @@ void DecmpsProc::ComputeHist(IN cvi* mask, OUT Hist& hist)
 	doFcvi(mask, i, j)
 	{
 		double v = cvg20(mask, i, j);
-		int idx = _i floor(v * histN / 255);
+		int idx = _i floor(v * (histN-1) / 255);
 		hist[idx] += 1;
 	}
 	doFv(i, hist) hist[i] /= mask->width * mask->height / histN;

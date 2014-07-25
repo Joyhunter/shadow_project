@@ -1,7 +1,7 @@
 #include "StdAfx.h"
 #include "gpm_proc.h"
 
-int nCores = 7;
+int nCores = 6;
 
 Interval::Interval(float min, float max):min(min), max(max)
 {
@@ -132,11 +132,13 @@ float RegularPatchDistMetric::ComputeVectorDist(Patch& vDst, Patch& vSrc)
 }
 
 float LmnIvrtPatchDistMetric::ComputeVectorDist(Patch& vDst, Patch& vSrc)
-{
+{ 
+	//return RegularPatchDistMetric().ComputeVectorDist(vDst, vSrc);
+	
 	//hls: dst(l)*a = src(l), D(dst(h, l*a), src(h, l))
-	int useAlpha[] = {-1, 1, -1};
-	float channelWeight[] = {2, 1, 0.9f};
-	bool hasHue = true;
+	//int useAlpha[] = {-1, 1, -1};
+	//float channelWeight[] = {2, 1, 0.9f};
+	//bool hasHue = true;
 
 	//hsv: dst(v)*a = src(v), D(dst(h, v*a), src(h, v))
 	//int useAlpha[] = {-1, -1, 1};
@@ -144,9 +146,9 @@ float LmnIvrtPatchDistMetric::ComputeVectorDist(Patch& vDst, Patch& vSrc)
 	//bool hasHue = true;
 
 	//rgb: dst(rgb)*a = src(rgb), D(dst(r*a, g*a, b*a), src(r, g, b))
-	//int useAlpha[] = {1, 1, 1};
-	//float channelWeight[] = {1, 1, 1};
-	//bool hasHue = false;
+	int useAlpha[] = {1, 2, 3};
+	float channelWeight[] = {1, 1, 1};
+	bool hasHue = false;
 
 	cvS sumS = cvs(0, 0, 0), sumD = cvs(0, 0, 0);
 	doFv(i, vSrc)
@@ -190,7 +192,11 @@ float LmnIvrtPatchDistMetric::ComputeVectorDist(Patch& vDst, Patch& vSrc)
 		sum += _f sqr(dstV.val[1] - srcV.val[1]) * channelWeight[1];
 		sum += _f sqr(dstV.val[2] - srcV.val[2]) * channelWeight[2];
 	}
-	return sqrt(sum / vDst.size());
+
+	float alphaPenlity = 1;
+	doF(i, 3) alphaPenlity *= 2.f - _f gaussian(fabs(_f log(alpha.val[i])), 0.0f, 0.01f);
+
+	return sqrt(sum / vDst.size()) * alphaPenlity;
 
 	
 }
@@ -603,11 +609,11 @@ void GridGPMProc::RunGridGPMMultiScale(cvi* src, string saveFile, int rat, int l
 
 		if(ratio == 1) break;
 		ratio /= downRatio;
-		//box.ShowCorr("temp.png");
 
 		box.LevelUp(downRatio);
 		//box.ShowCorr("temp2.png");
 	}
+	box.ShowCorr("temp.png");
 	cout<<"\rPatch match complete.\n";
 
 	box.Save(saveFile);

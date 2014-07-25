@@ -53,7 +53,7 @@ public:
 	~DecmpsProc(void);
 
 	void Analysis(IN cvi* src, IN cvi* maskMRF, OUT cvi* &shdwMask, 
-		IN float peekRatio = 1.0f, IN float boundRadius = 0.1f, IN int nLabels = 64);
+		IN float peekRatio = 1.0f, IN int nLabels = 64);
 
 private:
 
@@ -66,5 +66,8 @@ private:
 	void ShowStrtImg(Strt& strt, string fileDir);
 
 	cvi* GetBounaryMask(cvi* mask, int r);
+
+	int GetSmoothSize(cvi* maskMRF, cvi* &guidanceAlphaMap, int pixelStep = 2);
+	void SmoothBoundary(cvi* maskMRF, cvi* guidanceAlphaMap, cvi* &resMask, int smoothSize);
 };
 
