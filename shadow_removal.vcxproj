@@ -80,6 +80,7 @@
   <ItemGroup>
     <ClInclude Include="decmps_proc.h" />
     <ClInclude Include="gpm_proc.h" />
+    <ClInclude Include="img_container.h" />
     <ClInclude Include="ivrt_anys_proc.h" />
     <ClInclude Include="lumminance_invarient_descriptor.h" />
     <ClInclude Include="mrf_proc.h" />
@@ -93,6 +94,7 @@
   <ItemGroup>
     <ClCompile Include="decmps_proc.cpp" />
     <ClCompile Include="gpm_proc.cpp" />
+    <ClCompile Include="img_container.cpp" />
     <ClCompile Include="ivrt_anys_proc.cpp" />
     <ClCompile Include="lumminance_invarient_descriptor.cpp" />
     <ClCompile Include="mrf_proc.cpp" />

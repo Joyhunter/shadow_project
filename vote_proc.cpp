@@ -23,18 +23,19 @@ void VoteProc::LoadCorrs(string fileStr)
 }
 
 
-float VoteProc::EstmtShdwRatio(cvi* src, float distThres)
+float VoteProc::EstmtShdwRatio(ImgContainer& src, float distThres)
 {
+	return 1.0f;
 	float res = 0;
 	int resN = 0;
 	float shdwSize = 0;
-	doFcvi(src, i, j)
+	doFcvi(src.srcR(), i, j)
 	{
-		if(j == 0) cout<<"\rVoting: estimating "<<i*100/src->height<<"%.";
+		if(j == 0) cout<<"\rVoting: estimating "<<i*100/src.srcR()->height<<"%.";
 		MultiCorr corrs = m_corrs.GetCorrsPerGrid(i, j);
 		int nPatch = corrs.size();
 
-		Patch patch = PatchDistMetric::GetPatch(src, _f i, _f j, 1.f, 0.f, m_patchOffset);
+		Patch patch; PatchDistMetric::GetPatch(src, _f i, _f j, 1.f, 0.f, m_patchOffset, patch);
 		float lmnc = PatchLmncProc::GetAvgLmnc(patch);
 
 		float maxLumc = lmnc;
@@ -42,8 +43,8 @@ float VoteProc::EstmtShdwRatio(cvi* src, float distThres)
 		{
 			Corr& v = corrs[k];
 			if(v.dist > distThres) continue;
-			Patch patch2 = PatchDistMetric::GetPatch(src, v.x, v.y, v.s, v.r, 
-				m_patchOffset);
+			Patch patch2;
+			PatchDistMetric::GetPatch(src, v.x, v.y, v.s, v.r, m_patchOffset, patch2);
 			float lmnc2 = PatchLmncProc::GetAvgLmnc(patch2);
 			if(lmnc2 > maxLumc) maxLumc = lmnc2;
 		}
@@ -52,11 +53,11 @@ float VoteProc::EstmtShdwRatio(cvi* src, float distThres)
 		if(lmnc / maxLumc < 0.8) shdwSize++; 
 		resN++;
 	}
-	return shdwSize / src->width / src->height; // 0.46 0.28
+	return shdwSize / src.srcR()->width / src.srcR()->height; // 0.46 0.28
 	//return res/resN; //0.84 0.83
 }
 
-void VoteProc::Vote(cvi* src, OUT cvi* &mask, OUT cvi* &cfdcMap, 
+void VoteProc::Vote(ImgContainer& src, OUT cvi* &mask, OUT cvi* &cfdcMap, 
 	float distThres)
 {
 	float shadowRatio = EstmtShdwRatio(src, distThres);
@@ -86,16 +87,15 @@ void VoteProc::Vote(cvi* src, OUT cvi* &mask, OUT cvi* &cfdcMap,
 		cvs20(_test, i, j, distThresSpatial);
 
 		//get luminance
-		Patch patch = PatchDistMetric::GetPatch(src, _f i, _f j, 1.f, 0.f, m_patchOffset);
-		float lmnc = PatchLmncProc::GetAvgLmnc(patch);
-		float satu = PatchLmncProc::GetAvgSatu(patch);
-		lmncs.push_back(make_pair(cvPoint(round(i), round(j)), make_pair(lmnc, satu) ));
+		Patch patch; PatchDistMetric::GetPatch(src, _f i, _f j, 1.f, 0.f, m_patchOffset, patch);
+		float lmnc = PatchLmncProc::GetAvgLmnc(patch), lmnc2 = lmnc;
+		float satu = PatchLmncProc::GetAvgSatu(patch), satu2 = satu;
+		//lmncs.push_back(make_pair(cvPoint(round(i), round(j)), make_pair(lmnc, satu) ));
 		doF(k, nPatch)
 		{
 			Corr& v = corrs[k];
 			if(v.dist > distThres) continue;
-			patch = PatchDistMetric::GetPatch(src, v.x, v.y, v.s, v.r, 
-				m_patchOffset);
+			PatchDistMetric::GetPatch(src, v.x, v.y, v.s, v.r, m_patchOffset, patch);
 			lmnc = PatchLmncProc::GetAvgLmnc(patch);
 			satu = PatchLmncProc::GetAvgSatu(patch);
 			lmncs.push_back(make_pair(cvPoint(round(v.x), round(v.y)), make_pair(lmnc, satu)));
@@ -108,7 +108,28 @@ void VoteProc::Vote(cvi* src, OUT cvi* &mask, OUT cvi* &cfdcMap,
 		});
 
 		//vote TODO: confidence = f(coor.dist)
-		pair<float, float> highest = lmncs[lmncs.size() - 1].second;
+		if(lmncs.size() == 0)
+		{
+			cvS v = cvg2(mask, i, j);
+			v.val[0] += 1.0f;
+			v.val[1] += 1.0f;
+			v.val[2] += lmncs.size();
+			cvs2(mask, i, j, v);
+			continue;
+		}
+		int off = 3;
+		pair<float, float> highest = lmncs[0].second;
+		if(_i lmncs.size() >= off) highest = lmncs[lmncs.size() - off].second;
+		
+		//method 2
+		cvS v = cvg2(mask, i, j);
+		v.val[0] += clamp(lmnc2 / highest.first, 0.0f, 1.0f);
+		v.val[1] += clamp(satu2 / highest.second, 0.0f, 1.0f);
+		v.val[2] += lmncs.size();
+		cvs2(mask, i, j, v);
+		continue;
+
+		//method 1
 		doFv(i, lmncs)
 		{
 			CvPoint pos = lmncs[i].first;
@@ -135,6 +156,7 @@ void VoteProc::Vote(cvi* src, OUT cvi* &mask, OUT cvi* &cfdcMap,
 	{
 		auto v = cvg2(mask, i, j);
 		cvs2(cfdcMap, i, j, cvs(v.val[2] * 10));
+		v.val[2] = 1; //for method 1
 		if(v.val[1] != 0)
 		{
 			float alpha = _f v.val[0] / _f v.val[2] * 255;

@@ -149,45 +149,92 @@ void TexonAnysProc::GetTexonImg(IN cvi* image, IN int clusterN, OUT vector<TexDs
 	cvReleaseMat(&label);
 }
 
-cvi* TexonAnysProc::TexonAnalysis(cvi* image)
+cvi* TexonAnysProc::TexonAnalysis(cvi* image, int& clusterN, int ch)
 {
-	int ch = 0;
 
 	//get density map
 	cout<<"Texon: density computing..";
 	cvi* densityMap = GetDensityImg(image, ch);
 
-	cvi* densityVisual = VisualizeDensity(densityMap);
-	cvsi("_texon_density_map.png", densityVisual);
-	cvri(densityVisual);
+// 	cvi* densityVisual = VisualizeDensity(densityMap);
+// 	cvsi("_texon_density_map.png", densityVisual);
+// 	cvri(densityVisual);
 
 	//compute texon
 	cout<<"\rTexon: texton computing..";
-	int clusterN = 64;
 	vector<TexDscrptor> texDsps;
 	cvi* texIdxs = NULL;
 	GetTexonImg(densityMap, clusterN, texDsps, texIdxs, 0);
 
-	cvi* texonVisual = VisualizeTexon(texIdxs, clusterN);
-	cvsi("_texon_after_density_map.png", texonVisual);
-	cvri(texonVisual);
+	//TODO: decrease cluster number
+	//modify clusterN
+	clusterN = SimplyTexIdx(texIdxs, clusterN, texDsps);
 
 
-	GetTexonImg(image, clusterN, texDsps, texIdxs, ch);
-	texonVisual = VisualizeTexon(texIdxs, clusterN);
-	cvsi("_texon_map.png", texonVisual);
-	cvri(texonVisual);
-
+// 	GetTexonImg(image, clusterN, texDsps, texIdxs, ch);
+// 	texonVisual = VisualizeTexon(texIdxs, clusterN);
+// 	cvsi("_texon_map.png", texonVisual);
+// 	cvri(texonVisual);
 
 	cvri(densityMap);
-	cvri(texIdxs);
-	cout<<"\rTexon: texton computing done.\n";
-	doFv(i, texDsps)
+	cout<<"\rTexon: texton computing done, with clusters = "<<clusterN<<".\n";
+	return texIdxs;
+}
+
+int TexonAnysProc::SimplyTexIdx(IN OUT cvi* texIdxs, int clusterN, IN vector<TexDscrptor>& vectexDsps)
+{
+	vecI nPixels(clusterN, 0);
+	doFcvi(texIdxs, i, j)
 	{
-		doFv(j, texDsps[i]) cout<<texDsps[i][j]<<" ";
-		cout<<endl;
+		int idx = _i cvg20(texIdxs, i, j);
+		nPixels[idx]++;
 	}
-	return NULL;
+
+	int thres = texIdxs->height * texIdxs->width / clusterN / 20;
+	map<int, int> mapping;
+	int idx = 0;
+	while(mapping.size() < 10)
+	{
+		mapping.clear();
+		idx = 0;
+		doF(i, clusterN)
+		{
+			if(nPixels[i] > thres)
+			{
+				mapping[i] = idx;
+				idx++;
+			}
+		}
+		thres = thres/2;
+		break;
+	}
+
+	doF(i, clusterN)
+	{
+		if(nPixels[i] <= thres)
+		{
+			int minIdx = -1; float minDist = 1e30f;
+			for(auto p = mapping.begin(); p != mapping.end(); p++)
+			{
+				int j = p->first;
+				float dist = 0;
+				doFv(k, vectexDsps[j]) dist += sqr(vectexDsps[i][k] - vectexDsps[j][k]);
+				if(dist < minDist)
+				{
+					minDist = dist;
+					minIdx = p->second;
+				}
+			}
+			mapping[i] = minIdx;
+		}
+	}
+
+	doFcvi(texIdxs, i, j)
+	{
+		int v = _i cvg20(texIdxs, i, j);
+		cvs20(texIdxs, i, j, mapping[v]);
+	}
+	return idx;
 }
 
 cvi* TexonAnysProc::VisualizeDensity(cvi* densityMap)
@@ -208,16 +255,16 @@ cvi* TexonAnysProc::VisualizeDensity(cvi* densityMap)
 	return res;
 }
 
-cvi* TexonAnysProc::VisualizeTexon(IN cvi* texIdx, IN int clusterN)
+cvi* TexonAnysProc::VisualizeTexon(IN cvi* texIdx)
 {
-	vector<cvS> ranColors(clusterN);
 	randInit();
-	doFv(k, ranColors) ranColors[k] = cvs(rand1()*255.0, rand1()*255.0, rand1()*255.0);
+	map<int, cvS> mapping;
 	cvi* res = cvci83(texIdx);
 	doFcvi(res, i, j)
 	{
 		int idx = _i cvg20(texIdx, i, j);
-		cvs2(res, i, j, ranColors[idx]);
+		if(mapping.count(idx) == 0) mapping[idx] = cvs(rand1()*255.0, rand1()*255.0, rand1()*255.0);
+		cvs2(res, i, j, mapping[idx]);
 	}
 	return res;
 }

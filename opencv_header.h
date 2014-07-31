@@ -64,21 +64,48 @@ using namespace cv;
 
 /***************** abbreviation ******************/
 #define cvi IplImage
-#define cvli cvLoadImage
-#define cvlic(str) cvLoadImage(str, 1)
-#define cvlig(str) cvLoadImage(str, 0)
 #define cvS CvScalar
 #define cvs cvScalar
 #define cvs2 cvSet2D
 #define cvs20(src, i, j, v) cvSet2D(src, i, j, cvScalar(v))
 #define cvs23(src, i, j, v) cvSet2D(src, i, j, cvScalar(v, v, v))
 
+inline cvi* cvli(const char* fileName, int iscolor = 1)
+{
+	return cvLoadImage(fileName, iscolor);
+}
+
+inline cvi* cvli(string fileName, int iscolor = 1)
+{
+	return cvLoadImage(fileName.c_str(), iscolor);
+}
+
+inline cvi* cvlic(const char* fileName)
+{
+	return cvLoadImage(fileName, 1);
+}
+
+inline cvi* cvlic(string fileName)
+{
+	return cvLoadImage(fileName.c_str(), 1);
+}
+
+inline cvi* cvlig(const char* fileName)
+{
+	return cvLoadImage(fileName, 0);
+}
+
+inline cvi* cvlig(string fileName)
+{
+	return cvLoadImage(fileName.c_str(), 0);
+}
+
 inline cvi* cvci(CvSize size, int depth = 8, int channels = 3)
 {
 	return cvCreateImage(size, depth, channels);
 }
 
-inline cvi* cvci(cvi* img)
+inline cvi* cvci(const cvi* img)
 {
 	return cvCloneImage(img);
 }
@@ -100,12 +127,16 @@ inline int cvsi(const CvArr* image)
 
 inline void cvri(cvi* image)
 {
+	if(image == NULL) return;
 	cvReleaseImage(&image);
+	image = NULL;
 }
 
 inline void cvri(cvi** image)
 {
+	if(*image == NULL) return;
 	cvReleaseImage(image);
+	*image = NULL;
 }
 
 inline cvi* cvci83(const cvi* img)
@@ -211,6 +242,16 @@ inline double cvSDSqr(const cvS& c1, const cvS& c2)
 inline double cvSD(const cvS& c1, const cvS& c2)
 {
 	return sqrt(sqr(c1.val[0]-c2.val[0])+sqr(c1.val[1]-c2.val[1])+sqr(c1.val[2]-c2.val[2]));
+}
+
+inline double cvSDSqr(const cvS& c1)
+{
+	return sqr(c1.val[0])+sqr(c1.val[1])+sqr(c1.val[2]);
+}
+
+inline double cvSD(const cvS& c1)
+{
+	return sqrt(sqr(c1.val[0])+sqr(c1.val[1])+sqr(c1.val[2]));
 }
 
 #define colorDist(c1, c2) cvSD(c1, c2)

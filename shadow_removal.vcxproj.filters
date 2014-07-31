@@ -51,6 +51,9 @@
     <ClInclude Include="texon_proc.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="img_container.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp">
@@ -78,6 +81,9 @@
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="texon_proc.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="img_container.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>

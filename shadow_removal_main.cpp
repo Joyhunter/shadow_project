@@ -1,71 +1,52 @@
 #include "stdafx.h"
-#include "ivrt_anys_proc.h"
 #include "gpm_proc.h"
 #include "vote_proc.h"
 #include "mrf_proc.h"
 #include "decmps_proc.h"
-#include "texon_proc.h"
+#include "img_container.h"
 
 int _tmain(int argc, _TCHAR* argv[])
 {
-	string fileName = "1"; //1_small 7_test
+	//12 0.5  16 0.5   9 0.5
+	string fileName = "12"; //12(2, 0.5) 9(3, 0.5) 1(3, 0.5) 16(2, 0.5) 
+	//14(2, 0.2) 18(3, 0.2) 4(3) 
 	int step = 0;
 	int MRFLabelsN = 64;
 
-	cvi* srcOri = cvlic(("images//" + fileName + ".png").c_str()); // 600*450
-	int downRatio = 1; 
-	cvi* src = cvci83(srcOri->width / downRatio, srcOri->height / downRatio); //200*150
-	cvResize(srcOri, src);
-
-	//IvrtAnysProc iProc;
-	//cvi* ivrtSrc = iProc.IvrtAnalysis2(src);
-	//cvsi("_ivrt.png", ivrtSrc);
-
-	TexonAnysProc tproc;
-	tproc.TexonAnalysis(src);
-	return 0;
-
-	cvi* src2Ori = cvci(srcOri);
-	cvCvtColor(srcOri, src2Ori, CV_BGR2HLS_FULL);
-	cvi* src2 = cvci(src);
-	cvCvtColor(src, src2, CV_BGR2HLS_FULL);
-
-// 	cvsic("__h.png", src2Ori, 0);
-// 	cvsic("__l.png", src2Ori, 1);
-// 	cvsic("__s.png", src2Ori, 2);
-// 	return 0;
+	int downRatio = 2; 
+	ImgContainer img("images//" + fileName + ".png", downRatio);
 
 	//------------------- step 1 : patch match --------------------------------
-	int gridSize = _i(src->width * 0.28f);//56;//45;//41;//45;
-	int gridOffset = _i(src->width * 0.25f);//50;//39;//35;//39;
+	int gridSize = _i(img.src()->width * 0.28f);//56;//45;//41;//45;
+	int gridOffset = _i(img.src()->width * 0.25f);//50;//39;//35;//39;
 	int patchSize = 7;
 	string corrFileName = "images//corr//" + fileName + "_" + toStr(gridSize) 
-		+ "_" + toStr(gridOffset) + "_" + toStr(patchSize) + "test.txt";
+		+ "_" + toStr(gridOffset) + "_" + toStr(patchSize) + ".txt";
 
 	LmnIvrtPatchDistMetric metric2;
 	GridGPMProc proc(&metric2, gridSize, gridOffset, 1, patchSize, 30);
-	proc.SetROI(cvRect(0, 0, src->width, src->height));
 
 	if(step <= 0)
 	{
-		//proc.RunGridGPMMultiScale(ivrtSrc, corrFileName, 2, 1);
-		proc.RunGridGPMMultiScale(src, corrFileName, 2, 1);
-		proc.ShowGPMResUI(src, src2, corrFileName, 80);
+		proc.RunGridGPMMultiScale(img, corrFileName, 2, 1);
+		if(img.srcR() == NULL) img.GenerateResizedImg(1);
+		proc.ShowGPMResUI(img, corrFileName, 80);
 	}
 
 	//------------------- step 2 : voting  ------------------------------------
+	if(img.srcR() == NULL) img.GenerateResizedImg(1);
 	if(step <= 1)
 	{
 		cvi* initMask = NULL, *initCfdc = NULL; 
 		VoteProc vProc;
 		vProc.LoadCorrs(corrFileName);
-		vProc.Vote(src2, initMask, initCfdc, 80); //80/0.5 80/1.0 
+		vProc.Vote(img, initMask, initCfdc, 80); //80/0.5 80/1.0 
 		cvsic("_mask_2voting.png", initMask, 0);
 		cvsi("_ex_mask_voting.png", initMask);
 		cvsi("_ex_cnfdc_voting.png", initCfdc);
 		cvri(initMask); cvri(initCfdc);
 	}
-
+	return 0;
 	//------------------- step 3 : MRF ----------------------------------------
 	if(step <= 2)
 	{
@@ -73,9 +54,9 @@ int _tmain(int argc, _TCHAR* argv[])
 		cvi* initCfdc = cvlig("_ex_cnfdc_voting.png");
 		cvi* shdwMaskMRF = NULL;
 		MRFProc mProc;
-		mProc.SolveWithInitial(src, src, initMask, initCfdc, MRFLabelsN, shdwMaskMRF);
+		mProc.SolveWithInitial(img.src(), img.srcHLS(), initMask, initCfdc, MRFLabelsN, shdwMaskMRF);
 
-		cvi* shdwMaskMRFOri = cvci83(srcOri);
+		cvi* shdwMaskMRFOri = cvci83(img.srcOri());
 		cvResize(shdwMaskMRF, shdwMaskMRFOri);
 
 		cvsic("_mask_3mrf.png", shdwMaskMRFOri, 0);
@@ -92,7 +73,7 @@ int _tmain(int argc, _TCHAR* argv[])
 		cvi* shdwMask = NULL;
 		DecmpsProc dProc;
 		//peeks number: 0.8~0.9~1.0  bigger: less regions
-		dProc.Analysis(srcOri, shdwMaskMRF, shdwMask, 0.9f, MRFLabelsN);
+		dProc.Analysis(img.srcOri(), shdwMaskMRF, shdwMask, 0.9f, MRFLabelsN);
 		cvsic("_mask_5result.png", shdwMask, 0);
 		cvsi("_ex_mask_result.png", shdwMask);
 		cvri(shdwMaskMRF);
@@ -102,21 +83,19 @@ int _tmain(int argc, _TCHAR* argv[])
 	//------------------- step 5 : Recover ------------------------------------
 	cout<<"Recovery...";
 	cvi* shdwMask = cvlic("_ex_mask_result.png");
-	cvsi("_src.png", srcOri);
-	doFcvi(srcOri, i, j)
+	cvsi("_src.png", img.srcOri());
+	doFcvi(img.srcOri(), i, j)
 	{
-		auto v = cvg2(src2Ori, i, j);
+		auto v = cvg2(img.srcHLSOri(), i, j);
 		cvS alpha = cvg2(shdwMask, i, j) / 255.0;
 		//alpha.val[1] = 1;
-		cvs2(src2Ori, i, j, cvs(v.val[0], v.val[1] / alpha.val[0], v.val[2] / alpha.val[1]));
+		cvs2(img.srcHLSOri(), i, j, cvs(v.val[0], v.val[1] / alpha.val[0], v.val[2] / alpha.val[1]));
 	}
-	cvCvtColor(src2Ori, srcOri, CV_HLS2BGR_FULL);
-	cvsi("_src_rev.png", srcOri);
+	cvCvtColor(img.srcHLSOri(), img.srcOri(), CV_HLS2BGR_FULL);
+	cvsi("_src_rev.png", img.srcOri());
 	cvri(shdwMask);
 	cout<<"\rRecovery complete."<<endl;
 
-	cvri(src); cvri(src2); //cvri(ivrtSrc);
-	cvri(srcOri); cvri(src2Ori);
 	return 0;
 }
 
