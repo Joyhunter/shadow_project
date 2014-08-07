@@ -16,18 +16,29 @@ float Interval::RandValue()
 
 void Corr::Save(ostream& fout)
 {
-	fout<<x<<" "<<y<<" "<<s<<" "<<r<<" ";
-	doF(k, 3) fout<<bias.val[k]<<" ";
-	doF(k, 3) fout<<gain.val[k]<<" ";
-	fout<<dist<<endl;
+	oswrite(fout, x); oswrite(fout, y);
+	oswrite(fout, s); oswrite(fout, r);
+	doF(k, 3) oswrite(fout, _f bias.val[k]);
+	doF(k, 3) oswrite(fout, _f gain.val[k]);
+	oswrite(fout, dist);
 }
 
 void Corr::Load(istream& fin)
 {
-	fin>>x>>y>>s>>r;
-	doF(k, 3) fin>>bias.val[k];
-	doF(k, 3) fin>>gain.val[k];
-	fin>>dist;
+	osread(fin, x); osread(fin, y);
+	osread(fin, s); osread(fin, r);
+	float temp;
+	doF(k, 3)
+	{
+		osread(fin, temp);
+		bias.val[k] = temp;
+	}
+	doF(k, 3)
+	{
+		osread(fin, temp);
+		gain.val[k] = temp;
+	}
+	osread(fin, dist);
 }
 
 //------------------------- Dense Correlation ------------------------------------------
@@ -120,16 +131,17 @@ void DenseCorr::AddCoor(int r, int c, float cx, float cy, float cs, float cr, cv
 
 void DenseCorr::Save(ostream& fout)
 {
-	fout<<m_width<<" "<<m_height<<" "<<m_knn<<" "<<m_patchOffset<<" ";
-	fout<<m_values.size()<<endl;
+	oswrite(fout, m_width); oswrite(fout, m_height);
+	oswrite(fout, m_knn); oswrite(fout, m_patchOffset);
+	oswrite(fout, _i m_values.size());
 	doFv(i, m_values) m_values[i].Save(fout);
 }
 
 void DenseCorr::Load(istream& fin)
 {
-	fin>>m_width>>m_height>>m_knn>>m_patchOffset;
-	int size; fin>>size;
-	m_values.resize(size);
+	osread(fin, m_width); osread(fin, m_height);
+	osread(fin, m_knn); osread(fin, m_patchOffset);
+	int size; osread(fin, size); m_values.resize(size);
 	doFv(i, m_values) m_values[i].Load(fin);
 }
 
@@ -274,36 +286,54 @@ void DenseCorrBox2D::ShowGridCorrs(CvRect& roi, int r, int c, int radius, cvi* s
 
 void DenseCorrBox2D::Save(string file)
 {
-	ofstream fout(file.c_str());
-	fout<<m_nWidth<<" "<<m_nHeight<<" "<<m_srcW<<" "<<m_srcH<<endl;
-	fout<<m_box.size()<<endl;
+	ofstream fout(file.c_str(), ios::binary);
+	oswrite(fout, m_nWidth); oswrite(fout, m_nHeight);
+	oswrite(fout, m_srcW); oswrite(fout, m_srcH);
+	oswrite(fout, _i m_box.size());
 	doFv(i, m_box) m_box[i]->Save(fout);
-	fout<<wInts.size()<<endl;
-	doFv(i, wInts) fout<<wInts[i].min<<" "<<wInts[i].max<<endl;
-	fout<<hInts.size()<<endl;
-	doFv(i, hInts) fout<<hInts[i].min<<" "<<hInts[i].max<<endl;
+	oswrite(fout, _i wInts.size());
+	doFv(i, wInts)
+	{
+		oswrite(fout, wInts[i].min);
+		oswrite(fout, wInts[i].max);
+	}
+	oswrite(fout, _i hInts.size());
+	doFv(i, hInts)
+	{
+		oswrite(fout, hInts[i].min);
+		oswrite(fout, hInts[i].max);
+	}
 	fout.close();
 }
 
 void DenseCorrBox2D::Load(string file)
 {
-	ifstream fin(file.c_str());
+	ifstream fin(file.c_str(), ios::binary);
 	if(!fin)
 	{
 		cout<<file<<" not exist error!\n";
 		return;
 	}
-	fin>>m_nWidth>>m_nHeight>>m_srcW>>m_srcH;
-	int size; fin>>size; m_box.resize(size);
+	osread(fin, m_nWidth); osread(fin, m_nHeight);
+	osread(fin, m_srcW); osread(fin, m_srcH);
+	int size; osread(fin, size); m_box.resize(size);
 	doFv(i, m_box)
 	{
 		m_box[i] = new DenseCorr();
 		m_box[i]->Load(fin);
 	}
-	fin>>size; wInts.resize(size);
-	doFv(i, wInts) fin>>wInts[i].min>>wInts[i].max;
-	fin>>size; hInts.resize(size);
-	doFv(i, hInts) fin>>hInts[i].min>>hInts[i].max;
+	osread(fin, size); wInts.resize(size);
+	doFv(i, wInts)
+	{
+		osread(fin, wInts[i].min);
+		osread(fin, wInts[i].max);
+	}
+	osread(fin, size); hInts.resize(size);
+	doFv(i, hInts)
+	{
+		osread(fin, hInts[i].min);
+		osread(fin, hInts[i].max);
+	}
 	fin.close();
 }
 
@@ -330,8 +360,8 @@ void PatchDistMetric::GetPatch(ImgContainer& src, float x, float y, float s, flo
 {
 	int nPixels = sqr(2*patchOffset + 1);
 	
-	patch.ori.resize(nPixels);
-	//patch.hls.resize(nPixels);
+	//patch.ori.resize(nPixels);
+	patch.hls.resize(nPixels);
 	//patch.tex.resize(nPixels);
 	patch.texBinN = src.texClusterN();
 
@@ -343,8 +373,8 @@ void PatchDistMetric::GetPatch(ImgContainer& src, float x, float y, float s, flo
 		float spRowCur = x + length * sin(preAngle - r) * s;
 		float spColCur = y + length * cos(preAngle - r) * s;
 
-		patch.ori[idx] = cvg2(src.srcR(), spRowCur, spColCur);
-		//patch.hls[idx] = cvg2(src.srcHLSR(), spRowCur, spColCur);
+		//patch.ori[idx] = cvg2(src.srcR(), spRowCur, spColCur);
+		patch.hls[idx] = cvg2(src.srcHLSR(), spRowCur, spColCur);
 		//patch.tex[idx] = _i cvg20(src.texR(), round(spRowCur), round(spColCur));
 
 		idx++;
@@ -365,11 +395,17 @@ float PatchDistMetric::ComputePatchDist(ImgContainer& dst, float dpRow, float dp
 float PatchDistMetric::CptDistDirectWithBiasAndGain(vector<cvS>& vDst, vector<cvS>& vSrc, 
 	IN cvS bias, IN cvS gain)
 {
+// 	cout<<vDst[0].val[0]<<" "<<vDst[0].val[1]<<" "<<vDst[0].val[2]<<endl;
+// 	cout<<bias.val[0]<<" "<<bias.val[1]<<" "<<bias.val[2]<<endl;
+// 	cout<<gain.val[0]<<" "<<gain.val[1]<<" "<<gain.val[2]<<endl;
+
 	float sum = 0;
 	doFv(i, vDst)
 	{
-		sum += _f cvSDSqr(vDst[i], vSrc[i]*bias+gain);
+		sum += _f cvSDSqr(vDst[i], vSrc[i]*gain+bias);
 	}
+	//cout<<sqrt(sum / vDst.size())<<endl;
+	//pause;
 	return sqrt(sum / vDst.size());
 }
 
@@ -451,7 +487,7 @@ float RegularPatchDistMetric::ComputeVectorDist(Patch& vDst, Patch& vSrc, cvS bi
 
 float LmnIvrtPatchDistMetric::ComputeVectorDist(Patch& vDst, Patch& vSrc, cvS bias, cvS gain)
 { 
-	return CptDistDirectWithBiasAndGain(vDst.ori, vSrc.ori, bias, gain);
+	return CptDistDirectWithBiasAndGain(vDst.hls, vSrc.hls, bias, gain);
 
 	cvS alpha;
 	float hlsDist = CptDistAlphaWeight(vDst.hls, vSrc.hls, 
@@ -483,25 +519,22 @@ float LmnIvrtPatchDistMetric::ComputeVectorDist(Patch& vDst, Patch& vSrc, cvS bi
 
 //------------------------- Generalized Patch Match --------------------------------
 
-GPMProc::GPMProc(PatchDistMetric* metric, int knn, int patchSize, int nItr):
+GPMProc::GPMProc(PatchDistMetric* metric, int knn, int patchSize, int nItr, GPMRange* range):
 	m_metric(metric), m_knn(knn), m_patchSize(patchSize), m_nItr(nItr)
 {
 	m_patchOffset = (m_patchSize - 1) / 2;
 
-	m_scaleItrl.min = 0.67f;
-	m_scaleItrl.max = 1.5f;
-	m_rotateItrl.min = -1.05f * (float)CV_PI;
-	m_rotateItrl.max = 1.05f * (float)CV_PI;
-
-	m_biasItrl.resize(3);
-	m_biasItrl[0].min = 0.33f; m_biasItrl[0].max = 3.0f;
-	m_biasItrl[1].min = 0.33f; m_biasItrl[1].max = 3.0f;
-	m_biasItrl[2].min = 0.33f; m_biasItrl[2].max = 3.0f;
-
-	m_gainItrl.resize(3);
-	m_gainItrl[0].min = -0.1f; m_gainItrl[0].max = 0.1f;
-	m_gainItrl[1].min = -0.1f; m_gainItrl[1].max = 0.1f;
-	m_gainItrl[2].min = -0.1f; m_gainItrl[2].max = 0.1f;
+	if(range == NULL)
+	{
+		m_range.setScale(0.67f, 1.5f);
+		m_range.setRotate(-1.05f * (float)CV_PI, 1.05f * (float)CV_PI);
+		m_range.setGain(cvs(0.33, 0.33, 0.33), cvs(3, 3, 3));
+		m_range.setBias(cvs(-0.1, -0.1, -0.1), cvs(0.1, 0.1, 0.1));
+	}
+	else
+	{
+		m_range = *range;
+	}
 
 	randInit();
 }
@@ -524,7 +557,7 @@ DenseCorr* GPMProc::RunGPM(ImgContainer& src, ImgContainer& dst)
 
 	//random initialize
 	DenseCorr* dsCor = new DenseCorr(w, h, m_knn, m_patchOffset);
-	dsCor->RandomInitialize(swItvl, shItvl, m_scaleItrl, m_rotateItrl, m_biasItrl, m_gainItrl);
+	dsCor->RandomInitialize(swItvl, shItvl, m_range.m_scaleItrl, m_range.m_rotateItrl, m_range.m_biasItrl, m_range.m_gainItrl);
 	dsCor->UpdatePatchDistance(dst, src, m_metric);
 	//dsCor->ShowCorr("init.png");
 	//dsCor->ShowCorrDist("initDist.png");
@@ -642,25 +675,25 @@ void GPMProc::RandomSearch(ImgContainer& src, ImgContainer& dst, int x, int y,
 		Corr& v = corrs[k];
 		float hSpace = hItvl.max - hItvl.min;
 		float wSpace = wItvl.max - wItvl.min;
-		float sSpace = m_scaleItrl.max - m_scaleItrl.min;
-		float rSpace = m_rotateItrl.max - m_rotateItrl.min;
-		vector<float> biasSpace(m_biasItrl.size());
-		doFv(k, m_biasItrl) biasSpace[k] = m_biasItrl[k].max - m_biasItrl[k].min;
-		vector<float> gainSpace(m_gainItrl.size());
-		doFv(k, m_gainItrl) gainSpace[k] = m_gainItrl[k].max - m_gainItrl[k].min;
+		float sSpace = m_range.m_scaleItrl.max - m_range.m_scaleItrl.min;
+		float rSpace = m_range.m_rotateItrl.max - m_range.m_rotateItrl.min;
+		vector<float> biasSpace(m_range.m_biasItrl.size());
+		doFv(k, m_range.m_biasItrl) biasSpace[k] = m_range.m_biasItrl[k].max - m_range.m_biasItrl[k].min;
+		vector<float> gainSpace(m_range.m_gainItrl.size());
+		doFv(k, m_range.m_gainItrl) gainSpace[k] = m_range.m_gainItrl[k].max - m_range.m_gainItrl[k].min;
 		while(hSpace > 1 && wSpace > 1)
 		{
 			float newx = clamp(hSpace * (2 * rand1() - 1) + v.x, hItvl.min, hItvl.max);
 			float newy = clamp(wSpace * (2 * rand1() - 1) + v.y, wItvl.min, wItvl.max);
-			float news = clamp(sSpace * (2 * rand1() - 1) + v.s, m_scaleItrl.min, m_scaleItrl.max);
-			float newr = clamp(rSpace * (2 * rand1() - 1) + v.r, m_rotateItrl.min, m_rotateItrl.max);
+			float news = clamp(sSpace * (2 * rand1() - 1) + v.s, m_range.m_scaleItrl.min, m_range.m_scaleItrl.max);
+			float newr = clamp(rSpace * (2 * rand1() - 1) + v.r, m_range.m_rotateItrl.min, m_range.m_rotateItrl.max);
 			cvS newBias, newGain;
 			doF(k, 3)
 			{
 				newBias.val[k] = clamp(biasSpace[k] * (2 * rand1() - 1) + _f v.bias.val[k], 
-					m_biasItrl[k].min, m_biasItrl[k].max);
+					m_range.m_biasItrl[k].min, m_range.m_biasItrl[k].max);
 				newGain.val[k] = clamp(gainSpace[k] * (2 * rand1() - 1) + _f v.gain.val[k], 
-					m_gainItrl[k].min, m_gainItrl[k].max);
+					m_range.m_gainItrl[k].min, m_range.m_gainItrl[k].max);
 			}
 			
 			Patch srcPatch; m_metric->GetPatch(src, newx, newy, news, newr, m_patchOffset, srcPatch);
@@ -672,8 +705,8 @@ void GPMProc::RandomSearch(ImgContainer& src, ImgContainer& dst, int x, int y,
 			}
 			hSpace *= scaleFactor; wSpace *= scaleFactor;
 			sSpace *= scaleFactor; rSpace *= scaleFactor;
-			doFv(k, m_biasItrl) biasSpace[k] *= scaleFactor;
-			doFv(k, m_gainItrl) gainSpace[k] *= scaleFactor;
+			doFv(k, m_range.m_biasItrl) biasSpace[k] *= scaleFactor;
+			doFv(k, m_range.m_gainItrl) gainSpace[k] *= scaleFactor;
 		}
 	}
 }
@@ -687,11 +720,11 @@ float GPMProc::ComputePatchDist(ImgContainer& src, ImgContainer& dst, int x, int
 //--------------------- Grid Generalized Patch Match --------------------------------
 
 GridGPMProc::GridGPMProc(PatchDistMetric* metric, int gridSize, int gridStep,
-	int knn, int patchSize, int nItr):m_gridSize(gridSize), m_gridStep(gridStep), 
+	int knn, int patchSize, int nItr, GPMRange* range):m_gridSize(gridSize), m_gridStep(gridStep), 
 	m_patchSize(patchSize)
 {
 	m_roi = cvRect(0, 0, gridSize, gridSize);
-	m_proc = new GPMProc(metric, knn, patchSize, nItr);
+	m_proc = new GPMProc(metric, knn, patchSize, nItr, range);
 }
 
 GridGPMProc::~GridGPMProc(void)
@@ -741,13 +774,15 @@ void GridGPMProc::RunGridGPMSingleScale(ImgContainer& img, DenseCorrBox2D& box, 
 	vector<Interval>& wInts = box.wInts;
 	vector<Interval>& hInts = box.hInts;
 
+	int completesum = 0;
+	cout<<"\r  "<<completesum<<"/"<<nGridh * nGridw<<" completed.";
 	omp_set_num_threads(nCores);
 #pragma omp parallel for
 	doF(k, nGridh * nGridw)
 	{
 		int i = k / nGridw;
 		int j = k % nGridw;
-		cout<<"\rPatch-match processing grid ("<<i<<", "<<j<<")";
+		//cout<<"\rPatch-match processing grid ("<<i<<", "<<j<<")";
 		int gridW = _i wInts[j].max - _i wInts[j].min, gridH = _i hInts[i].max - _i hInts[i].min;
 		
 		ImgContainer* gpmSrc = img.GetCropedInstance(cvRect(_i wInts[j].min, _i hInts[i].min, gridW, gridH));
@@ -763,6 +798,9 @@ void GridGPMProc::RunGridGPMSingleScale(ImgContainer& img, DenseCorrBox2D& box, 
 		}
 
 		delete gpmSrc;
+
+		completesum++;
+		cout<<"\r  "<<completesum<<"/"<<nGridh * nGridw<<" completed.";
 	}
 
 }
@@ -799,7 +837,7 @@ void GridGPMProc::RunGridGPMMultiScale(ImgContainer& img, string saveFile, int r
 		//box.ShowCorr("temp2.png");
 	}
 	box.ShowCorr("temp.png");
-	cout<<"\rPatch match complete.\n";
+	//cout<<"\rPatch match complete.\n";
 
 	box.Save(saveFile);
 
@@ -887,9 +925,14 @@ float PatchLmncProc::GetAvgLmnc(Patch& vs)
 // 	return sum / vs.hls.size();
 
 	//rgb
+// 	float sum = 0;
+// 	doFv(i, vs.ori) sum += _f cvSDSqr(vs.ori[i], cvs(0, 0, 0));
+// 	return sqrt(sum / vs.ori.size()) / sqrt(3.0f);
+
+	//lab
 	float sum = 0;
-	doFv(i, vs.ori) sum += _f cvSDSqr(vs.ori[i], cvs(0, 0, 0));
-	return sqrt(sum / vs.ori.size()) / sqrt(3.0f);
+	doFv(i, vs.hls) sum += _f vs.hls[i].val[0];
+	return sum / vs.hls.size();
 }
 
 float PatchLmncProc::GetAvgSatu(Patch& vs)

@@ -133,14 +133,33 @@ public:
 	vector<Interval> wInts, hInts;
 };
 
+struct GPMRange
+{
+	Interval m_scaleItrl, m_rotateItrl;
+	vector<Interval> m_biasItrl, m_gainItrl;
 
+	void setScale(float minV, float maxV)
+	{ m_scaleItrl.min = minV; m_scaleItrl.max = maxV;};
+	void setRotate(float minV, float maxV)
+	{ m_rotateItrl.min = minV; m_rotateItrl.max = maxV;};
+	void setBias(cvS minV, cvS maxV)
+	{
+		m_biasItrl.resize(3);
+		doF(k, 3){m_biasItrl[k].min = _f minV.val[k]; m_biasItrl[k].max = _f maxV.val[k];}
+	};
+	void setGain(cvS minV, cvS maxV)
+	{
+		m_gainItrl.resize(3);
+		doF(k, 3){m_gainItrl[k].min = _f minV.val[k]; m_gainItrl[k].max = _f maxV.val[k];}
+	};
+};
 
 class GPMProc
 {
 
 public:
 
-	GPMProc(PatchDistMetric* metric, int knn = 1, int patchSize = 7, int nItr = 10);
+	GPMProc(PatchDistMetric* metric, int knn = 1, int patchSize = 7, int nItr = 10, GPMRange* range = NULL);
 	~GPMProc(void);
 
 	DenseCorr* RunGPM(ImgContainer& src, ImgContainer& dst);
@@ -166,8 +185,9 @@ private:
 	int m_patchSize, m_patchOffset;
 	int m_nItr;
 	
-	Interval m_scaleItrl, m_rotateItrl;
-	vector<Interval> m_biasItrl, m_gainItrl;
+	GPMRange m_range;
+	//Interval m_scaleItrl, m_rotateItrl;
+	//vector<Interval> m_biasItrl, m_gainItrl;
 
 };
 
@@ -176,7 +196,7 @@ class GridGPMProc
 public:
 
 	GridGPMProc(PatchDistMetric* metric, int gridSize = 50, int gridStep = 40, 
-		int knn = 1, int patchSize = 7, int nItr = 10);
+		int knn = 1, int patchSize = 7, int nItr = 10, GPMRange* range = NULL);
 	~GridGPMProc(void);
 
 	void SetROI(CvRect roi);

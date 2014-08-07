@@ -8,7 +8,7 @@ class ImgContainer
 public:
 	
 	ImgContainer();
-	ImgContainer(string fileDir, int downRatio = 1);
+	ImgContainer(string fileDir, int downRatio = 1, int colorMode = CV_BGR2HLS_FULL);
 	~ImgContainer(void);
 
 	cvi* src(){return m_src;};
@@ -45,6 +45,8 @@ private:
 	cvi* m_srcHLSR;
 	cvi* m_texR;
 	int m_texClusterN;
+
+	int m_colorMode;
 
 };
 

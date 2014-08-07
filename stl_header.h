@@ -200,3 +200,28 @@ inline bool fequal(float v1, float v2)
 {
 	return (fabs(v1 - v2) < 1e-6);
 }
+
+inline void oswrite(ostream& fout, int v)
+{
+	fout.write((char*)(&v), 4);
+}
+inline void oswrite(ostream& fout, float v)
+{
+	fout.write((char*)(&v), 4);
+}
+inline void oswrite(ostream& fout, double v)
+{
+	fout.write((char*)(&v), 8);
+}
+inline void osread(istream& fin, int& v)
+{
+	fin.read((char*)(&v), 4);
+}
+inline void osread(istream& fin, float& v)
+{
+	fin.read((char*)(&v), 4);
+}
+inline void osread(istream& fin, double& v)
+{
+	fin.read((char*)(&v), 8);
+}

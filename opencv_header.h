@@ -303,6 +303,12 @@ inline cvS operator / (const cvS& c, const T v)
 	return cvs(c.val[0] / v, c.val[1] / v, c.val[2] / v);
 }
 
+template <class T>
+inline cvS operator ^ (const cvS& c, const T v)
+{
+	return cvs(pow(c.val[0], v), pow(c.val[1], v), pow(c.val[2], v));
+}
+
 inline cvS operator + (const cvS& c1, const cvS& c2)
 {
 	return cvs(c1.val[0] + c2.val[0], c1.val[1] + c2.val[1], c1.val[2] + c2.val[2]);

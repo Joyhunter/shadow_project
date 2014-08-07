@@ -6,10 +6,11 @@ ImgContainer::ImgContainer():m_srcOri(NULL), m_srcHLS(NULL), m_src(NULL),
 {
 }
 
-ImgContainer::ImgContainer(string fileDir, int downRatio):m_srcOri(NULL), m_srcHLS(NULL), m_src(NULL),
+ImgContainer::ImgContainer(string fileDir, int downRatio, int colorMode):m_srcOri(NULL), m_srcHLS(NULL), m_src(NULL),
 	m_srcHLSOri(NULL), m_tex(NULL), m_srcR(NULL), m_srcHLSR(NULL), m_texR(NULL)
 {
 	m_downRatio = downRatio;
+	m_colorMode = colorMode;
 	m_srcOri = cvlic(fileDir.c_str()); // 600*450
 	m_src = cvci83(m_srcOri->width / downRatio, m_srcOri->height / downRatio); //200*150
 	cvResize(m_srcOri, m_src);
@@ -20,9 +21,9 @@ ImgContainer::ImgContainer(string fileDir, int downRatio):m_srcOri(NULL), m_srcH
 
 
 	m_srcHLSOri = cvci(m_srcOri);
-	cvCvtColor(m_srcOri, m_srcHLSOri, CV_BGR2HLS_FULL);
+	cvCvtColor(m_srcOri, m_srcHLSOri, m_colorMode);
 	m_srcHLS = cvci(m_src);
-	cvCvtColor(m_src, m_srcHLS, CV_BGR2HLS_FULL);
+	cvCvtColor(m_src, m_srcHLS, m_colorMode);
 
 	// 	cvsic("__h.png", m_srcHLSOri, 0);
 	// 	cvsic("__l.png", m_srcHLSOri, 1);
@@ -35,7 +36,7 @@ ImgContainer::ImgContainer(string fileDir, int downRatio):m_srcOri(NULL), m_srcH
 // 	m_tex = tproc.TexonAnalysis(m_srcOri, m_texClusterN, 0);
 // 	cvsi("preComp.png", m_tex);
 
-	m_tex = cvlig("preComp.png");
+	//m_tex = cvlig("preComp.png");
 
 }
 
@@ -55,14 +56,14 @@ void ImgContainer::GenerateResizedImg(int ratio)
 	cvResize(m_src, m_srcR);
 
 	m_srcHLSR = cvci(m_srcR);
-	cvCvtColor(m_srcR, m_srcHLSR, CV_BGR2HLS_FULL);
+	cvCvtColor(m_srcR, m_srcHLSR, m_colorMode);
 
-	m_texR = cvci81(m_srcR);
-	ResizeTex(m_tex, m_texR);
+// 	m_texR = cvci81(m_srcR);
+// 	ResizeTex(m_tex, m_texR);
 
-	cvi* texonVisual = TexonAnysProc::VisualizeTexon(m_texR);
-	cvsi("_texon_after_density_map.png", texonVisual);
-	cvri(texonVisual);
+// 	cvi* texonVisual = TexonAnysProc::VisualizeTexon(m_texR);
+// 	cvsi("_texon_after_density_map.png", texonVisual);
+// 	cvri(texonVisual);
 }
 
 void ImgContainer::ResizeTex(IN cvi* tex, OUT cvi* texR)
