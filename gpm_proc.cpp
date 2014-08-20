@@ -269,13 +269,14 @@ void DenseCorrBox2D::ShowGridCorrs(CvRect& roi, int r, int c, int radius, cvi* s
 	cvri(res);
 }
 
-void DenseCorrBox2D::ShowGridCorrs(CvRect& roi, int r, int c, int radius, cvi* src, cvi* res)
+void DenseCorrBox2D::ShowGridCorrs(CvRect& roi, int r, int c, int radius, cvi* src, cvi* res, float distThres)
 {
 	MultiCorr corrs = GetCorrsPerGrid(r, c);
 	int basicRadius = radius;
 	doFv(i, corrs)
 	{
-		float dist = clamp(corrs[i].dist / 100.0f, 0.f, 1.f);
+		float dist = clamp(corrs[i].dist / distThres, 0.f, 1.f);
+		if(dist < 1) dist = 0;
 		float alpha = (1 - dist); 
 		DrawRectToCvi(res, corrs[i].x, corrs[i].y, _f basicRadius, 
 			cvs(0, 0, 255*alpha), corrs[i].s, corrs[i].r);
@@ -867,7 +868,7 @@ void UIMouseClick(int event, int x, int y, int flags, void *param)
 	cvi* show = cvci(ui_src.srcR());
 	CvRect& rect = ui_proc->GetROI();
 	ui_box->ShowGridCorrs(rect, y - rect.y, x - rect.x, ui_proc->GetPatchRadius(), 
-		ui_src.srcR(), show);
+		ui_src.srcR(), show, uiParam->distThres);
 	cvShowImage(uiParam->ui_winTitle.c_str(), show);
 	//cvsi("_1.png", show);
 	cvri(show);
@@ -926,8 +927,8 @@ float PatchLmncProc::GetAvgLmnc(Patch& vs)
 
 	//rgb
 // 	float sum = 0;
-// 	doFv(i, vs.ori) sum += _f cvSDSqr(vs.ori[i], cvs(0, 0, 0));
-// 	return sqrt(sum / vs.ori.size()) / sqrt(3.0f);
+// 	doFv(i, vs.hls) sum += _f cvSDSqr(vs.hls[i], cvs(0, 0, 0));
+// 	return sqrt(sum / vs.hls.size()) / sqrt(3.0f);
 
 	//lab
 	float sum = 0;

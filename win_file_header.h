@@ -29,6 +29,12 @@
 /***************** header ************************/
 #include <stdio.h>
 #include <io.h>
+#include <direct.h>
+
+inline void wMkDir(string dir)
+{
+	_mkdir(dir.c_str());
+}
 
 inline void wGetDirFiles(string fileDir, vector<string>& fileNames)
 {

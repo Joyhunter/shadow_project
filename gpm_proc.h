@@ -121,7 +121,7 @@ public:
 	}
 	MultiCorr GetCorrsPerGrid(int r, int c);
 	void ShowGridCorrs(CvRect& roi, int r, int c, int radius, cvi* src, string imgStr);
-	void ShowGridCorrs(CvRect& roi, int r, int c, int radius, cvi* src, cvi* res);
+	void ShowGridCorrs(CvRect& roi, int r, int c, int radius, cvi* src, cvi* res, float distThres = 80);
 	void Save(string file);
 	void Load(string file);
 	void LevelUp(int ratio = 2);

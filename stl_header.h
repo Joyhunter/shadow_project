@@ -73,6 +73,7 @@ typedef vector<double> vecD;
 #define doFsv(i, j, v) for (size_t i = j; i < v.size(); i++)
 
 #define _f (float)
+#define _d (double)
 #define _i (int)
 #define pause system("pause")
 
