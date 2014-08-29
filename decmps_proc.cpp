@@ -64,7 +64,8 @@ void DecmpsProc::Analysis(IN cvi* src, IN cvi* maskMRF, OUT cvi* &shdwMask,
 			shdwMask = cvlic("_ex_mask_decop.png");
 
 			SmoothBoundary(maskMRF, guidanceAlphaMap, resMask, smoothSize);
-			cvCopy(resMask, shdwMask);
+			doFcvi(shdwMask, i, j) cvs20(shdwMask, i, j, cvg20(resMask, i, j));
+			//cvCopy(resMask, shdwMask);
 			cvri(resMask);
 			cvri(boundMask);
 		}
@@ -334,7 +335,7 @@ void Strt::Filter()
 	doFv(i, cells)
 	{
 		if(cells[i].avgV > 200) cells[i].legal = false; // 200
-		if(cells[i].pixelNum < 0.4) cells[i].legal = false;
+		if(cells[i].pixelNum < 0.2) cells[i].legal = false;
 		if(cells[i].ratio < 0.2) cells[i].legal = false;
 		//if(cells[i].edgeWeight > 0.6) cells[i].legal = false;
 	}

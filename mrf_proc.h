@@ -6,10 +6,14 @@ public:
 	MRFProc(void);
 	~MRFProc(void);
 
+	//ori
 	void SolveWithInitial(IN cvi* src, IN cvi* srcHLS, IN cvi* initMask, IN cvi* initCfdc,
 		IN int nLabels, OUT cvi* &shdwMask);
 	void SolveWithInitAndGidc(IN cvi* src, IN cvi* initMask, IN cvi* gdcMask, IN cvi* boundMask, IN int nLabels, 
 		OUT cvi* &shdwMask, IN int smoothSize);
+
+	//current
+	void SolveWithInitialAllCh(IN cvi* src, IN cvi* initParam, IN int nLabels, OUT cvi* &shdwMask);
 
 private:
 
